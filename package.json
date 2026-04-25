@@ -1,0 +1,26 @@
+{
+  "name": "circuit-fit-tv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Système d'entraînement en circuit multi-écrans synchronisés",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "pwa"
+  ],
+  "scripts": {
+    "dev": "echo 'À configurer au Sprint 0 : lance backend + pwa en parallèle'",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "services:up": "docker compose up -d",
+    "services:down": "docker compose down",
+    "services:reset": "docker compose down -v && docker compose up -d",
+    "services:logs": "docker compose logs -f"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

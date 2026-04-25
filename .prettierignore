@@ -1,0 +1,8 @@
+node_modules
+dist
+build
+coverage
+.next
+.svelte-kit
+*.min.*
+package-lock.json

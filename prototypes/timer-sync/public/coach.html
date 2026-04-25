@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coach — Circuit Fit TV</title>
+  <style>
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --accent: #3b82f6;
+      --text: #e2e8f0; --muted: #94a3b8;
+      --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+      padding: 1.5rem; max-width: 1100px; margin: 0 auto;
+    }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; }
+    .conn { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--err); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--surface); border-radius: 12px; padding: 1.5rem;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .panel h2 { font-size: 1rem; margin-bottom: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+    .status {
+      display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem;
+      font-size: 0.95rem; margin-bottom: 1rem;
+    }
+    .status dt { color: var(--muted); }
+    .status dd { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    .big-timer {
+      text-align: center; font-size: 4rem; font-weight: 900; font-variant-numeric: tabular-nums;
+      margin: 1rem 0; line-height: 1; letter-spacing: -0.03em;
+    }
+    .phase-indicator {
+      text-align: center; margin-bottom: 1rem; padding: 0.6rem;
+      background: rgba(0,0,0,0.3); border-radius: 8px; text-transform: uppercase;
+      font-size: 0.85rem; letter-spacing: 0.1em; font-weight: 600;
+    }
+    .phase-indicator.work { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+    .phase-indicator.rest { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .phase-indicator.transition { background: rgba(234, 88, 12, 0.2); color: #fdba74; }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    button {
+      font-family: inherit; font-size: 0.95rem; padding: 0.7rem 1rem; border: none;
+      border-radius: 8px; cursor: pointer; font-weight: 600; color: #fff;
+      background: rgba(255,255,255,0.1); transition: background 0.15s, transform 0.1s;
+    }
+    button:hover { background: rgba(255,255,255,0.15); }
+    button:active { transform: scale(0.97); }
+    button.primary { background: var(--accent); }
+    button.primary:hover { background: #2563eb; }
+    button.warn { background: #d97706; }
+    button.warn:hover { background: #b45309; }
+    button.danger { background: #b91c1c; }
+    button.danger:hover { background: #991b1b; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .clients-list {
+      display: flex; flex-direction: column; gap: 0.5rem; max-height: 360px; overflow-y: auto;
+    }
+    .client-item {
+      display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+      gap: 0.75rem; padding: 0.7rem 1rem; background: rgba(0,0,0,0.25); border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    .client-role {
+      font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+      background: rgba(255,255,255,0.1); text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .client-role.tv { background: rgba(34, 197, 94, 0.25); color: #86efac; }
+    .client-role.coach { background: rgba(59, 130, 246, 0.25); color: #93c5fd; }
+    .client-time { font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--muted); }
+
+    .empty { color: var(--muted); font-style: italic; padding: 1rem; text-align: center; }
+    .footer { margin-top: 2rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎛️ Coach — Panneau de contrôle</h1>
+    <div class="conn">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-text">Connexion...</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Session</h2>
+      <div id="no-session" class="empty">Aucune session en cours</div>
+      <div id="session-active" style="display:none;">
+        <div class="phase-indicator" id="phase-indicator">—</div>
+        <div class="big-timer" id="big-timer">00:00</div>
+        <dl class="status">
+          <dt>Phase</dt><dd id="st-phase">—</dd>
+          <dt>Progression</dt><dd id="st-progress">—</dd>
+          <dt>Statut</dt><dd id="st-status">—</dd>
+        </dl>
+      </div>
+
+      <div class="btn-row" style="margin-top: 1rem;">
+        <button id="btn-start" class="primary">▶️ Démarrer</button>
+        <button id="btn-pause">⏸️ Pause</button>
+        <button id="btn-resume">▶️ Reprendre</button>
+        <button id="btn-skip" class="warn">⏭️ Skip</button>
+        <button id="btn-stop" class="danger">⏹️ Arrêter</button>
+      </div>
+
+      <div style="margin-top: 0.75rem;">
+        <h2 style="margin-bottom: 0.5rem;">Ajuster timer</h2>
+        <div class="btn-row">
+          <button data-adjust="-10000">-10s</button>
+          <button data-adjust="-5000">-5s</button>
+          <button data-adjust="5000">+5s</button>
+          <button data-adjust="10000">+10s</button>
+          <button data-adjust="30000">+30s</button>
+        </div>
+      </div>
+
+      <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--muted);">
+        Mon offset: <span id="my-offset">—</span> ms &nbsp;|&nbsp; RTT: <span id="my-rtt">—</span> ms
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Clients connectés (<span id="clients-count">0</span>)</h2>
+      <div class="clients-list" id="clients-list">
+        <div class="empty">Aucun client</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Ouvre aussi <a href="/tv" target="_blank">/tv</a> (plusieurs onglets)
+    et <a href="/drift" target="_blank">/drift</a> pour les métriques.
+  </div>
+
+  <script type="module">
+    import { SyncClient } from '/sync-client.js';
+
+    const client = new SyncClient({ role: 'coach', label: 'Coach' });
+    let session = null;
+    let clients = [];
+
+    const $connDot = document.getElementById('conn-dot');
+    const $connText = document.getElementById('conn-text');
+    const $noSession = document.getElementById('no-session');
+    const $sessionActive = document.getElementById('session-active');
+    const $phaseIndicator = document.getElementById('phase-indicator');
+    const $bigTimer = document.getElementById('big-timer');
+    const $stPhase = document.getElementById('st-phase');
+    const $stProgress = document.getElementById('st-progress');
+    const $stStatus = document.getElementById('st-status');
+    const $clientsList = document.getElementById('clients-list');
+    const $clientsCount = document.getElementById('clients-count');
+    const $myOffset = document.getElementById('my-offset');
+    const $myRtt = document.getElementById('my-rtt');
+
+    client.addEventListener('connection', (e) => {
+      const { connected } = e.detail;
+      $connDot.classList.toggle('ok', connected);
+      $connText.textContent = connected ? 'Connecté' : 'Déconnecté';
+    });
+
+    client.addEventListener('clock', (e) => {
+      $myOffset.textContent = e.detail.offsetMs.toFixed(1);
+      $myRtt.textContent = e.detail.rttMs.toFixed(1);
+    });
+
+    client.addEventListener('SESSION_UPDATE', (e) => {
+      session = e.detail;
+      renderSession();
+    });
+
+    client.addEventListener('SESSION_ENDED', () => {
+      session = null;
+      renderSession();
+    });
+
+    client.addEventListener('CLIENT_LIST', (e) => {
+      clients = e.detail;
+      renderClients();
+    });
+
+    function renderSession() {
+      if (!session || !session.phase) {
+        $noSession.style.display = '';
+        $sessionActive.style.display = 'none';
+        return;
+      }
+      $noSession.style.display = 'none';
+      $sessionActive.style.display = '';
+      $phaseIndicator.textContent = session.phase.type;
+      $phaseIndicator.className = 'phase-indicator ' + session.phase.type;
+      $stPhase.textContent = session.phase.label;
+      $stProgress.textContent = `${session.currentPhaseIdx + 1} / ${session.totalPhases}`;
+      $stStatus.textContent = session.status;
+    }
+
+    function renderClients() {
+      $clientsCount.textContent = clients.length;
+      if (!clients.length) {
+        $clientsList.innerHTML = '<div class="empty">Aucun client</div>';
+        return;
+      }
+      $clientsList.innerHTML = clients
+        .map((c) => `
+          <div class="client-item">
+            <span class="client-role ${c.role}">${c.role}</span>
+            <span>${escapeHtml(c.label)}</span>
+            <span class="client-time">${new Date(c.connectedAt).toLocaleTimeString()}</span>
+          </div>
+        `).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    // Actualiser le gros timer à l'écran
+    function tick() {
+      if (session && session.phase) {
+        let remaining;
+        if (session.status === 'paused') {
+          remaining = session.remainingOnPauseMs;
+        } else {
+          remaining = client.remainingMsUntil(session.phaseEndsAt);
+        }
+        remaining = Math.max(0, remaining);
+        const totalSec = Math.ceil(remaining / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        $bigTimer.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // Bind des boutons
+    document.getElementById('btn-start').onclick = () => client.send('START');
+    document.getElementById('btn-pause').onclick = () => client.send('PAUSE');
+    document.getElementById('btn-resume').onclick = () => client.send('RESUME');
+    document.getElementById('btn-skip').onclick = () => client.send('SKIP');
+    document.getElementById('btn-stop').onclick = () => {
+      if (confirm('Arrêter la session ?')) client.send('STOP');
+    };
+    document.querySelectorAll('[data-adjust]').forEach((b) => {
+      b.onclick = () => client.send('ADJUST', { deltaMs: parseInt(b.dataset.adjust, 10) });
+    });
+
+    client.connect();
+  </script>
+</body>
+</html>

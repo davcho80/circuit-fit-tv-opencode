@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Station — Circuit Fit TV</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a; color: #fff; display: flex; flex-direction: column;
+      transition: background 0.6s;
+    }
+    body.phase-work { background: linear-gradient(135deg, #059669, #047857); }
+    body.phase-rest { background: linear-gradient(135deg, #2563eb, #1e40af); }
+    body.phase-transition { background: linear-gradient(135deg, #ea580c, #c2410c); }
+    body.phase-idle { background: linear-gradient(135deg, #334155, #1e293b); }
+
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.2rem 2rem; font-size: 0.9rem;
+      background: rgba(0,0,0,0.25);
+    }
+    .label { font-weight: 600; letter-spacing: 0.05em; opacity: 0.85; }
+    .conn {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; }
+    .dot.ok { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .main {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      align-items: center; text-align: center; padding: 1rem;
+    }
+    .phase-type { font-size: 2rem; text-transform: uppercase; letter-spacing: 0.2em; opacity: 0.85; margin-bottom: 0.5rem; }
+    .phase-label { font-size: 1.4rem; opacity: 0.75; margin-bottom: 2rem; max-width: 80%; }
+    .timer {
+      font-size: clamp(8rem, 25vw, 20rem);
+      font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;
+      letter-spacing: -0.05em;
+      text-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    .timer.warn { animation: pulse 0.8s infinite; color: #fef3c7; }
+    @keyframes pulse { 50% { transform: scale(1.05); } }
+    .progress {
+      width: 80%; max-width: 900px; height: 6px; background: rgba(0,0,0,0.3);
+      border-radius: 3px; overflow: hidden; margin-top: 1.5rem;
+    }
+    .progress-bar { height: 100%; background: #fff; transition: width 0.2s linear; width: 0; }
+    .idle-msg { font-size: 2rem; opacity: 0.6; }
+    .footer {
+      padding: 0.8rem 2rem; background: rgba(0,0,0,0.3); font-size: 0.8rem;
+      display: flex; justify-content: space-between;
+      font-variant-numeric: tabular-nums; opacity: 0.7;
+    }
+  </style>
+</head>
+<body class="phase-idle">
+  <div class="header">
+    <div class="label" id="tv-label">TV —</div>
+    <div class="conn">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-text">Connexion...</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="idle" class="idle-msg">En attente du coach...</div>
+    <div id="active" style="display:none; width:100%;">
+      <div class="phase-type" id="phase-type"></div>
+      <div class="phase-label" id="phase-label"></div>
+      <div class="timer" id="timer">00:00</div>
+      <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Offset: <span id="offset">—</span> ms &nbsp; | &nbsp; RTT: <span id="rtt">—</span> ms</span>
+    <span>Heure locale: <span id="local-time">—</span></span>
+  </div>
+
+  <script type="module">
+    import { SyncClient } from '/sync-client.js';
+
+    // Label persistant par onglet (pour différencier les TV)
+    const storageKey = 'tv-label';
+    let label = sessionStorage.getItem(storageKey);
+    if (!label) {
+      label = 'TV-' + Math.floor(Math.random() * 9000 + 1000);
+      sessionStorage.setItem(storageKey, label);
+    }
+    document.getElementById('tv-label').textContent = label;
+    document.title = label + ' — Circuit Fit TV';
+
+    const client = new SyncClient({ role: 'tv', label });
+
+    let currentSession = null;
+
+    // Rendu des éléments
+    const $idle = document.getElementById('idle');
+    const $active = document.getElementById('active');
+    const $phaseType = document.getElementById('phase-type');
+    const $phaseLabel = document.getElementById('phase-label');
+    const $timer = document.getElementById('timer');
+    const $progress = document.getElementById('progress-bar');
+    const $connDot = document.getElementById('conn-dot');
+    const $connText = document.getElementById('conn-text');
+    const $offset = document.getElementById('offset');
+    const $rtt = document.getElementById('rtt');
+    const $localTime = document.getElementById('local-time');
+
+    // Écouter la connexion
+    client.addEventListener('connection', (e) => {
+      const { connected } = e.detail;
+      $connDot.classList.toggle('ok', connected);
+      $connText.textContent = connected ? 'Connecté' : 'Déconnecté';
+    });
+
+    client.addEventListener('clock', (e) => {
+      const { offsetMs, rttMs } = e.detail;
+      $offset.textContent = offsetMs.toFixed(1);
+      $rtt.textContent = rttMs.toFixed(1);
+    });
+
+    client.addEventListener('SESSION_UPDATE', (e) => {
+      currentSession = e.detail;
+      applySession();
+    });
+
+    client.addEventListener('SESSION_ENDED', () => {
+      currentSession = null;
+      applySession();
+    });
+
+    function applySession() {
+      if (!currentSession || !currentSession.phase) {
+        $idle.style.display = '';
+        $active.style.display = 'none';
+        document.body.className = 'phase-idle';
+        return;
+      }
+      $idle.style.display = 'none';
+      $active.style.display = '';
+      const { phase, status } = currentSession;
+      $phaseType.textContent = phase.type;
+      $phaseLabel.textContent = phase.label;
+      document.body.className = 'phase-' + phase.type;
+      if (status === 'paused') {
+        document.body.classList.add('paused');
+      }
+    }
+
+    // Boucle d'affichage du timer (requestAnimationFrame)
+    // Calcul local basé sur offsetMs + phaseEndsAt pour éviter toute désync serveur.
+    let lastDriftReport = 0;
+    function tick() {
+      const session = currentSession;
+      if (session && session.phase) {
+        let remainingMs;
+        if (session.status === 'paused') {
+          remainingMs = session.remainingOnPauseMs;
+        } else {
+          remainingMs = client.remainingMsUntil(session.phaseEndsAt);
+        }
+        remainingMs = Math.max(0, remainingMs);
+
+        // Affichage timer
+        const totalSec = Math.ceil(remainingMs / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        $timer.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        $timer.classList.toggle('warn', session.status === 'running' && remainingMs <= 5000 && remainingMs > 0);
+
+        // Barre de progression
+        const total = session.phase.durationMs;
+        const done = total - remainingMs;
+        const pct = Math.max(0, Math.min(100, (done / total) * 100));
+        $progress.style.width = pct + '%';
+
+        // Télémétrie de dérive : on reporte le timer affiché + l'offset calculé
+        // Le coach/drift page pourra comparer entre clients.
+        const now = Date.now();
+        if (now - lastDriftReport > 500) {
+          lastDriftReport = now;
+          client.send('DRIFT_REPORT', {
+            phaseEndsAt: session.phaseEndsAt,
+            remainingMs,
+            displayedSec: totalSec,
+            offsetMs: client.clockOffsetMs,
+            rttMs: client.clockRttMs,
+            clientNow: now,
+          });
+        }
+      }
+      $localTime.textContent = new Date().toLocaleTimeString();
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    client.connect();
+
+    // Prévenir mise en veille (TV = toujours allumée)
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').catch(() => {});
+    }
+  </script>
+</body>
+</html>

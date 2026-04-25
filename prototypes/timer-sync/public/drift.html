@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moniteur de dérive — Circuit Fit TV</title>
+  <style>
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --accent: #3b82f6;
+      --text: #e2e8f0; --muted: #94a3b8;
+      --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh; padding: 1.5rem;
+      max-width: 1200px; margin: 0 auto;
+    }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; }
+    .subtitle { color: var(--muted); margin-top: 0.25rem; font-size: 0.9rem; }
+
+    .verdict {
+      padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; text-align: center;
+      background: var(--surface); border: 2px solid rgba(255,255,255,0.05);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .verdict.ok { border-color: var(--ok); background: rgba(34, 197, 94, 0.1); }
+    .verdict.warn { border-color: var(--warn); background: rgba(245, 158, 11, 0.1); }
+    .verdict.err { border-color: var(--err); background: rgba(239, 68, 68, 0.1); }
+    .verdict-label { text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; }
+    .verdict-value { font-size: 2.8rem; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+    .verdict-details { color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+    .panel { background: var(--surface); border-radius: 12px; padding: 1.25rem; border: 1px solid rgba(255,255,255,0.05); }
+    .panel h2 { font-size: 0.95rem; color: var(--muted); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+    td.num { font-variant-numeric: tabular-nums; text-align: right; }
+    .stale { color: var(--muted); opacity: 0.5; }
+
+    .chart { width: 100%; height: 180px; margin-top: 0.5rem; }
+    .empty { color: var(--muted); font-style: italic; padding: 1rem; text-align: center; }
+
+    .legend-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.8rem; color: var(--muted); }
+    .legend-row span { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>📊 Moniteur de dérive temps réel</h1>
+      <div class="subtitle">Mesure la différence de temps restant entre tous les clients TV connectés</div>
+    </div>
+    <div>
+      <span id="conn-text">Connexion...</span>
+    </div>
+  </header>
+
+  <div class="verdict" id="verdict">
+    <div class="verdict-label">Dérive maximale observée</div>
+    <div class="verdict-value" id="v-value">—</div>
+    <div class="verdict-details" id="v-details">En attente de données...</div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Clients TV actifs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>TV</th>
+            <th class="num">Timer</th>
+            <th class="num">Offset</th>
+            <th class="num">RTT</th>
+            <th class="num">Δ vs réf.</th>
+          </tr>
+        </thead>
+        <tbody id="clients-tbody">
+          <tr><td colspan="5" class="empty">Aucune TV connectée</td></tr>
+        </tbody>
+      </table>
+      <div class="legend-row">
+        <span>Δ = écart en ms par rapport à la TV de référence (première connectée)</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Dérive dans le temps (60s glissantes)</h2>
+      <canvas id="chart" class="chart"></canvas>
+      <div class="legend-row">
+        <span><span class="legend-dot" style="background:#22c55e"></span> Δ max</span>
+        <span><span class="legend-dot" style="background:#3b82f6"></span> Δ moyen</span>
+        <span>Seuil cible : 100 ms</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { SyncClient } from '/sync-client.js';
+
+    const client = new SyncClient({ role: 'monitor', label: 'Drift Monitor' });
+
+    // État : clientId → { label, lastReport, remainingMs, displayedSec, offsetMs, rttMs, lastSeenAt }
+    const tvs = new Map();
+    // Historique pour le chart : [{t, maxDrift, avgDrift}]
+    const history = [];
+    const HISTORY_MS = 60_000;
+    const DRIFT_THRESHOLD_MS = 100;
+
+    const $connText = document.getElementById('conn-text');
+    const $verdict = document.getElementById('verdict');
+    const $vValue = document.getElementById('v-value');
+    const $vDetails = document.getElementById('v-details');
+    const $tbody = document.getElementById('clients-tbody');
+    const $chart = document.getElementById('chart');
+    const ctx = $chart.getContext('2d');
+
+    client.addEventListener('connection', (e) => {
+      $connText.textContent = e.detail.connected ? 'Connecté' : 'Déconnecté';
+    });
+
+    client.addEventListener('DRIFT_DATA', (e) => {
+      const data = e.detail;
+      tvs.set(data.clientId, {
+        label: data.label,
+        remainingMs: data.remainingMs,
+        displayedSec: data.displayedSec,
+        offsetMs: data.offsetMs,
+        rttMs: data.rttMs,
+        phaseEndsAt: data.phaseEndsAt,
+        lastSeenAt: Date.now(),
+      });
+    });
+
+    // Nettoyage des TV silencieuses (plus de rapport depuis 3s)
+    setInterval(() => {
+      const cutoff = Date.now() - 3000;
+      for (const [id, tv] of tvs) {
+        if (tv.lastSeenAt < cutoff) tvs.delete(id);
+      }
+    }, 1000);
+
+    // Calcul de la dérive et affichage
+    function compute() {
+      const list = Array.from(tvs.entries()).map(([id, tv]) => ({ id, ...tv }));
+      if (list.length === 0) {
+        return { list, maxDrift: 0, avgDrift: 0, refId: null };
+      }
+      // Référence = premier client (ordre d'insertion)
+      const ref = list[0];
+      list.forEach((tv) => {
+        // Dérive par rapport à la référence = différence de remainingMs
+        // (comme tous les clients partagent le même phaseEndsAt serveur,
+        // la différence de remainingMs vient uniquement de leur horloge corrigée)
+        tv.drift = tv.remainingMs - ref.remainingMs;
+      });
+      const drifts = list.map((t) => Math.abs(t.drift));
+      const maxDrift = drifts.length ? Math.max(...drifts) : 0;
+      const avgDrift = drifts.length ? drifts.reduce((a, b) => a + b, 0) / drifts.length : 0;
+      return { list, maxDrift, avgDrift, refId: ref.id };
+    }
+
+    function render() {
+      const { list, maxDrift, avgDrift, refId } = compute();
+
+      // Verdict
+      if (list.length < 2) {
+        $verdict.className = 'verdict';
+        $vValue.textContent = '—';
+        $vDetails.textContent = list.length === 0
+          ? 'Aucune TV connectée. Ouvre /tv dans au moins deux onglets.'
+          : 'Une seule TV connectée. Ouvre une autre TV pour mesurer la dérive.';
+      } else {
+        const cls = maxDrift <= DRIFT_THRESHOLD_MS ? 'ok'
+                  : maxDrift <= 200 ? 'warn' : 'err';
+        $verdict.className = 'verdict ' + cls;
+        $vValue.textContent = `${maxDrift.toFixed(0)} ms`;
+        $vDetails.textContent = `Moyenne : ${avgDrift.toFixed(1)} ms · Seuil cible : ${DRIFT_THRESHOLD_MS} ms · ${list.length} TV`;
+      }
+
+      // Tableau
+      if (list.length === 0) {
+        $tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucune TV connectée</td></tr>';
+      } else {
+        $tbody.innerHTML = list.map((tv) => {
+          const m = Math.floor(tv.displayedSec / 60);
+          const s = tv.displayedSec % 60;
+          const timer = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+          const isRef = tv.id === refId;
+          const driftStr = isRef ? 'réf.' : `${tv.drift > 0 ? '+' : ''}${tv.drift.toFixed(0)} ms`;
+          return `
+            <tr>
+              <td>${escapeHtml(tv.label)}${isRef ? ' ⭐' : ''}</td>
+              <td class="num">${timer}</td>
+              <td class="num">${tv.offsetMs.toFixed(1)}</td>
+              <td class="num">${tv.rttMs.toFixed(1)}</td>
+              <td class="num">${driftStr}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Historique pour le chart
+      history.push({ t: Date.now(), maxDrift, avgDrift });
+      const cutoff = Date.now() - HISTORY_MS;
+      while (history.length && history[0].t < cutoff) history.shift();
+
+      drawChart();
+    }
+
+    function drawChart() {
+      const rect = $chart.getBoundingClientRect();
+      $chart.width = rect.width * devicePixelRatio;
+      $chart.height = rect.height * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      const W = rect.width, H = rect.height;
+      ctx.clearRect(0, 0, W, H);
+
+      // Grille
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i <= 4; i++) {
+        const y = (H - 20) * (i / 4) + 5;
+        ctx.moveTo(40, y); ctx.lineTo(W - 10, y);
+      }
+      ctx.stroke();
+
+      if (history.length < 2) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = '12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('En attente de données...', W / 2, H / 2);
+        return;
+      }
+
+      const maxVal = Math.max(200, ...history.map((h) => h.maxDrift));
+      const now = Date.now();
+      const tMin = now - HISTORY_MS;
+
+      // Labels Y (ms)
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'right';
+      for (let i = 0; i <= 4; i++) {
+        const val = maxVal * (1 - i / 4);
+        const y = (H - 20) * (i / 4) + 9;
+        ctx.fillText(`${val.toFixed(0)}`, 35, y);
+      }
+
+      // Seuil 100ms
+      const thresholdY = (H - 20) * (1 - DRIFT_THRESHOLD_MS / maxVal) + 5;
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(40, thresholdY);
+      ctx.lineTo(W - 10, thresholdY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Tracer maxDrift et avgDrift
+      const drawSerie = (key, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        history.forEach((h, i) => {
+          const x = 40 + (W - 50) * ((h.t - tMin) / HISTORY_MS);
+          const y = (H - 20) * (1 - h[key] / maxVal) + 5;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      };
+      drawSerie('avgDrift', '#3b82f6');
+      drawSerie('maxDrift', '#22c55e');
+
+      // Axe X : "-60s" à "0s"
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText('-60s', 40, H - 4);
+      ctx.textAlign = 'right';
+      ctx.fillText('maintenant', W - 10, H - 4);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    // Rendu toutes les 250ms
+    setInterval(render, 250);
+
+    client.connect();
+  </script>
+</body>
+</html>

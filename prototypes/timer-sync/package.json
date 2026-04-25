@@ -1,0 +1,18 @@
+{
+  "name": "circuit-fit-tv-poc-timer-sync",
+  "version": "0.1.0",
+  "description": "Proof of concept pour la synchronisation multi-écrans du projet Circuit Fit TV",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.0.3",
+    "@fastify/websocket": "^11.0.1",
+    "fastify": "^5.1.0",
+    "ws": "^8.20.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
