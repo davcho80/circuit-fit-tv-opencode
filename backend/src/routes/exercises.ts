@@ -11,6 +11,7 @@
 import type { FastifyInstance } from 'fastify';
 import { ExerciseCreate } from '@cfitv/shared';
 import { prisma } from '../db.js';
+import { processVideoUpload } from '../exercises/video.js';
 
 // Retire les clés undefined et caste vers le type Prisma attendu.
 // Nécessaire car Zod .partial() produit { key?: T | undefined } mais Prisma
@@ -79,12 +80,34 @@ export async function exercisesRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
-  // POST /exercises/:id/video  (stub — traitement FFmpeg au Sprint 1)
+  // POST /exercises/:id/video  — upload multipart → FFmpeg → MinIO
   app.post<{ Params: { id: string } }>('/exercises/:id/video', async (req, reply) => {
     const exists = await prisma.exercise.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Exercise not found' });
 
-    // TODO Sprint 1 : consommer le multipart, lancer FFmpeg, uploader sur MinIO
-    return reply.code(501).send({ error: 'Video upload not yet implemented' });
+    const data = await req.file();
+    if (!data) return reply.code(400).send({ error: 'No file attached' });
+
+    const mime = data.mimetype;
+    if (!mime.startsWith('video/')) {
+      return reply.code(415).send({ error: 'File must be a video' });
+    }
+
+    try {
+      const result = await processVideoUpload(data.file, req.params.id);
+
+      const updated = await prisma.exercise.update({
+        where: { id: req.params.id },
+        data: {
+          videoUrl: result.videoUrl,
+          thumbnailUrl: result.thumbnailUrl,
+          durationSec: result.durationSec,
+        },
+      });
+      return updated;
+    } catch (err) {
+      req.log.error({ err }, 'Video processing failed');
+      return reply.code(500).send({ error: 'Video processing failed', detail: String(err) });
+    }
   });
 }

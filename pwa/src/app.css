@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Thème sombre par défaut — usage en salle de sport */
+:root {
+  color-scheme: dark;
+}
+
+/* Smooth scroll sur les listes longues */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus visible accessible */
+:focus-visible {
+  outline: 2px solid theme(--color-sky-400);
+  outline-offset: 2px;
+}

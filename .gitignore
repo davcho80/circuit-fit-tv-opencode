@@ -39,6 +39,17 @@ out/
 secrets/
 credentials/
 
+# ----- PWA -----
+pwa/.svelte-kit/
+pwa/build/
+pwa/.env.development.local
+
+# ----- Playwright MCP -----
+.playwright-mcp/
+
+# ----- Prisma generated client -----
+backend/src/generated/
+
 # ----- Database / media local -----
 *.sqlite
 *.sqlite3

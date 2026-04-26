@@ -11,10 +11,12 @@
 import Fastify, { type FastifyServerOptions } from 'fastify';
 import websocket from '@fastify/websocket';
 import multipart from '@fastify/multipart';
+import cors from '@fastify/cors';
 import { randomUUID } from 'node:crypto';
 
 import { config } from './config.js';
 import { prisma } from './db.js';
+import { ensureBuckets } from './storage.js';
 import { hub } from './ws/hub.js';
 import type { ClientRole } from './ws/hub.js';
 import { handleMessage } from './ws/handlers.js';
@@ -33,6 +35,13 @@ const app = Fastify({ logger: loggerConfig });
 
 // ---- Plugins ----
 
+// CORS : autorisé en dev depuis le dev server Vite (5173)
+await app.register(cors, {
+  origin: config.isDev
+    ? ['http://localhost:5173', 'http://127.0.0.1:5173']
+    : false,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+});
 await app.register(websocket);
 await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2 GB max
 
@@ -133,6 +142,9 @@ async function start(): Promise<void> {
   try {
     await prisma.$connect();
     app.log.info('Database connected');
+
+    await ensureBuckets();
+    app.log.info('Storage buckets ready');
 
     await app.listen({ port: config.port, host: config.host });
   } catch (err) {
