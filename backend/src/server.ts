@@ -12,7 +12,15 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import websocket from '@fastify/websocket';
 import multipart from '@fastify/multipart';
 import cors from '@fastify/cors';
+import staticFiles from '@fastify/static';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+// En production le build PWA est dans ../pwa/build (relatif au dist/)
+const PWA_BUILD = join(__dirname, '..', '..', 'pwa', 'build');
 
 import { config } from './config.js';
 import { prisma } from './db.js';
@@ -44,6 +52,27 @@ await app.register(cors, {
 });
 await app.register(websocket);
 await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2 GB max
+
+// ---- Fichiers statiques PWA ----
+// En production : sert le build SvelteKit depuis pwa/build/
+// En dev : redirige vers le dev server Vite
+if (!config.isDev && existsSync(PWA_BUILD)) {
+  await app.register(staticFiles, {
+    root: PWA_BUILD,
+    prefix: '/',
+    // SPA fallback : toute route non-trouvée renvoie 200.html
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-cache');
+    },
+  });
+  // Catch-all pour le routage SPA
+  app.setNotFoundHandler((_req, reply) => {
+    return reply.sendFile('200.html', PWA_BUILD);
+  });
+} else if (config.isDev) {
+  // En dev, une simple redirection vers Vite
+  app.get('/', (_req, reply) => reply.redirect('http://localhost:5173'));
+}
 
 // ---- Routes REST ----
 
