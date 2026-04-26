@@ -124,21 +124,26 @@
             </p>
           </div>
         {:else}
-          <label class="flex items-center justify-center gap-2 border-2 border-dashed
-                        border-slate-700 hover:border-sky-600 rounded-lg p-6 cursor-pointer
-                        transition-colors group">
+          <!-- L'input est caché mais pas réduit à 1px (sr-only bloque le file picker sur Chrome) -->
+          <input
+            bind:this={fileInput}
+            type="file"
+            accept="video/*"
+            onchange={handleFileChange}
+            class="hidden"
+          />
+          <button
+            type="button"
+            onclick={() => fileInput?.click()}
+            class="w-full flex items-center justify-center gap-2 border-2 border-dashed
+                   border-slate-700 hover:border-sky-600 rounded-lg p-6 cursor-pointer
+                   transition-colors group bg-transparent"
+          >
             <span class="text-2xl">📁</span>
             <span class="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
               Choisir un fichier vidéo
             </span>
-            <input
-              bind:this={fileInput}
-              type="file"
-              accept="video/*"
-              onchange={handleFileChange}
-              class="sr-only"
-            />
-          </label>
+          </button>
         {/if}
 
         {#if uploadError}
