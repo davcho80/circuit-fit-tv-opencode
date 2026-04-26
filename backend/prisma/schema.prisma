@@ -1,0 +1,136 @@
+// ============================================================
+// Circuit Fit TV — Prisma Schema
+// ------------------------------------------------------------
+// Source de vérité DB. Doit rester cohérent avec les modèles
+// Zod dans packages/shared/src/models.ts.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ----- Enums -----
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum RotationMode {
+  CLASSIC
+  FIXED
+}
+
+enum DisplayRole {
+  STATION
+  CENTRAL
+  UNASSIGNED
+}
+
+enum SessionStatus {
+  RUNNING
+  PAUSED
+  COMPLETED
+  ABORTED
+}
+
+enum PhaseType {
+  TRANSITION
+  WORK
+  REST
+}
+
+// ----- Exercise -----
+
+model Exercise {
+  id           String     @id @default(uuid())
+  name         String     @db.VarChar(100)
+  description  String?    @db.VarChar(280)
+  videoUrl     String
+  thumbnailUrl String
+  durationSec  Int
+  muscleGroups String[]   @default([])
+  equipment    String[]   @default([])
+  difficulty   Difficulty
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Stations qui référencent cet exercice
+  stationExercises CircuitStationExercise[]
+}
+
+// ----- Circuit -----
+
+model Circuit {
+  id             String       @id @default(uuid())
+  name           String       @db.VarChar(100)
+  description    String?      @db.VarChar(500)
+  rounds         Int
+  workSec        Int
+  restSec        Int
+  transitionSec  Int
+  rotationMode   RotationMode
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  stations CircuitStation[]
+  sessions Session[]
+}
+
+model CircuitStation {
+  id        String  @id @default(uuid())
+  circuit   Circuit @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  circuitId String
+  position  Int
+
+  exercises CircuitStationExercise[]
+
+  @@unique([circuitId, position])
+}
+
+// Table de jointure Station ↔ Exercise (ordre possible dans le futur)
+model CircuitStationExercise {
+  station    CircuitStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  stationId  String
+  exercise   Exercise       @relation(fields: [exerciseId], references: [id])
+  exerciseId String
+
+  @@id([stationId, exerciseId])
+}
+
+// ----- Display -----
+
+model Display {
+  id            String      @id @default(uuid())
+  name          String      @db.VarChar(50)
+  role          DisplayRole @default(UNASSIGNED)
+  stationNumber Int?
+  lastSeen      DateTime?
+  deviceModel   String?
+  deviceOs      String?
+  appVersion    String?
+  pairedAt      DateTime?
+}
+
+// ----- Session -----
+
+model Session {
+  id                 String        @id @default(uuid())
+  circuit            Circuit       @relation(fields: [circuitId], references: [id])
+  circuitId          String
+  startedAt          DateTime      @default(now())
+  endedAt            DateTime?
+  status             SessionStatus @default(RUNNING)
+  currentRound       Int           @default(1)
+  currentPhase       PhaseType     @default(TRANSITION)
+  currentStationIdx  Int           @default(0)
+  phaseEndsAt        DateTime?
+  pausedAt           DateTime?
+  remainingOnPauseMs Int?
+}
