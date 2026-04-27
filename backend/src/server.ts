@@ -37,6 +37,7 @@ import { displaysRoutes } from './routes/displays.js';
 import { sessionsRoutes } from './routes/sessions.js';
 import { pairRoutes } from './routes/pair.js';
 import { schedulesRoutes } from './routes/schedules.js';
+import { statsRoutes } from './routes/stats.js';
 import { startScheduler } from './sessions/scheduler.js';
 import { removeByClient } from './ws/pair.js';
 
@@ -123,6 +124,7 @@ await app.register(displaysRoutes);
 await app.register(sessionsRoutes);
 await app.register(pairRoutes);
 await app.register(schedulesRoutes);
+await app.register(statsRoutes);
 
 // ---- WebSocket endpoint ----
 

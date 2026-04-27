@@ -7,6 +7,7 @@
     { href: '/circuits',  label: 'Circuits',  icon: '🔄' },
     { href: '/session',   label: 'Session',   icon: '▶️' },
     { href: '/sessions',  label: 'Historique', icon: '📋' },
+    { href: '/stats',     label: 'Stats',      icon: '📈' },
     { href: '/schedule',  label: 'Calendrier', icon: '📅' },
     { href: '/screens',   label: 'Écrans',    icon: '📺' },
     { href: '/tv',        label: 'TV Station', icon: '🖥️' },

@@ -217,6 +217,30 @@ export const circuits = {
   },
 };
 
+// ---- Types Stats ----
+
+export interface Stats {
+  total:          number;
+  last7Days:      number;
+  last30Days:     number;
+  completed:      number;
+  aborted:        number;
+  completionRate: number;
+  avgDurationMin: number;
+  topCircuits:    Array<{ circuitId: string; name: string; count: number }>;
+  byDay:          Array<{ day: string; count: number }>;
+}
+
+export const stats = {
+  get(fetchFn?: typeof globalThis.fetch): Promise<Stats> {
+    return request('GET', '/stats', undefined, fetchFn);
+  },
+  exportCsvUrl(): string {
+    const BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+    return `${BASE}/stats/export.csv`;
+  },
+};
+
 // ---- Types Session ----
 
 export type SessionStatus = 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'ABORTED';
