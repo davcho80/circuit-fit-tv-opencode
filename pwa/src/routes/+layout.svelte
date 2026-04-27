@@ -23,7 +23,8 @@
   // Pages d'auth : pas de barre de navigation
   const isAuthPage = $derived(
     $page.url.pathname.startsWith('/login') ||
-    $page.url.pathname.startsWith('/change-password'),
+    $page.url.pathname.startsWith('/change-password') ||
+    $page.url.pathname.startsWith('/setup'),
   );
 
   async function handleLogout() {
