@@ -57,16 +57,18 @@
   {:else}
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {#each data.circuits as c (c.id)}
-        <div class="bg-slate-900 border border-slate-800 hover:border-slate-600
+        <div class="relative bg-slate-900 border border-slate-800 hover:border-slate-600
                     rounded-xl p-5 transition-colors group">
+          <!-- Lien étendu sur toute la carte -->
+          <a href="/circuits/{c.id}" class="absolute inset-0 rounded-xl" aria-label={c.name}></a>
+
           <!-- En-tête -->
           <div class="flex items-start justify-between mb-3">
             <div class="flex-1 min-w-0">
-              <a href="/circuits/{c.id}"
-                 class="font-semibold text-slate-100 hover:text-sky-300 transition-colors
-                        block truncate">
+              <span class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors
+                           block truncate">
                 {c.name}
-              </a>
+              </span>
               {#if c.description}
                 <p class="text-xs text-slate-500 mt-0.5 line-clamp-1">{c.description}</p>
               {/if}
@@ -74,7 +76,7 @@
             <button
               onclick={() => deleteCircuit(c.id, c.name)}
               disabled={deleting === c.id}
-              class="text-slate-600 hover:text-red-400 transition-colors ml-2 shrink-0"
+              class="relative z-10 text-slate-600 hover:text-red-400 transition-colors ml-2 shrink-0"
               title="Supprimer"
             >
               {deleting === c.id ? '…' : '🗑️'}

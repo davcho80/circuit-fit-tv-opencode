@@ -2,9 +2,9 @@ import { displays, type Display } from '$lib/api.js';
 
 const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
 
-export async function load() {
+export async function load({ fetch }: { fetch: typeof globalThis.fetch }) {
   const [displayList, onlineRes] = await Promise.all([
-    displays.list(),
+    displays.list(fetch),
     fetch(`${BASE}/displays/online`).then((r) => r.json() as Promise<{ onlineIds: string[] }>).catch(() => ({ onlineIds: [] })),
   ]);
 

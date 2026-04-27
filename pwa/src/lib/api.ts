@@ -8,8 +8,8 @@
 // En prod : vide → même origine (Fastify sert le frontend)
 const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+async function request<T>(method: string, path: string, body?: unknown, fetchFn: typeof globalThis.fetch = globalThis.fetch): Promise<T> {
+  const res = await fetchFn(`${BASE}${path}`, {
     method,
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -60,12 +60,12 @@ export interface PaginatedExercises {
 // ---- Exercises ----
 
 export const exercises = {
-  list(page = 1, limit = 20): Promise<PaginatedExercises> {
-    return request('GET', `/exercises?page=${page}&limit=${limit}`);
+  list(page = 1, limit = 20, fetchFn?: typeof globalThis.fetch): Promise<PaginatedExercises> {
+    return request('GET', `/exercises?page=${page}&limit=${limit}`, undefined, fetchFn);
   },
 
-  get(id: string): Promise<Exercise> {
-    return request('GET', `/exercises/${id}`);
+  get(id: string, fetchFn?: typeof globalThis.fetch): Promise<Exercise> {
+    return request('GET', `/exercises/${id}`, undefined, fetchFn);
   },
 
   create(data: ExerciseCreate): Promise<Exercise> {
@@ -175,12 +175,12 @@ export interface CircuitCreate {
 // ---- Circuits ----
 
 export const circuits = {
-  list(): Promise<Circuit[]> {
-    return request('GET', '/circuits');
+  list(fetchFn?: typeof globalThis.fetch): Promise<Circuit[]> {
+    return request('GET', '/circuits', undefined, fetchFn);
   },
 
-  get(id: string): Promise<Circuit> {
-    return request('GET', `/circuits/${id}`);
+  get(id: string, fetchFn?: typeof globalThis.fetch): Promise<Circuit> {
+    return request('GET', `/circuits/${id}`, undefined, fetchFn);
   },
 
   create(data: CircuitCreate): Promise<Circuit> {
@@ -232,8 +232,8 @@ export interface SessionHistory {
 }
 
 export const sessions = {
-  list(): Promise<SessionHistory[]> {
-    return request('GET', '/sessions');
+  list(fetchFn?: typeof globalThis.fetch): Promise<SessionHistory[]> {
+    return request('GET', '/sessions', undefined, fetchFn);
   },
 };
 
@@ -262,8 +262,8 @@ export interface DisplayPatch {
 // ---- Displays ----
 
 export const displays = {
-  list(): Promise<Display[]> {
-    return request('GET', '/displays');
+  list(fetchFn?: typeof globalThis.fetch): Promise<Display[]> {
+    return request('GET', '/displays', undefined, fetchFn);
   },
 
   update(id: string, data: DisplayPatch): Promise<Display> {
@@ -309,8 +309,8 @@ export interface ScheduleCreate {
 // ---- Schedules ----
 
 export const schedules = {
-  list(): Promise<Schedule[]> {
-    return request('GET', '/schedules');
+  list(fetchFn?: typeof globalThis.fetch): Promise<Schedule[]> {
+    return request('GET', '/schedules', undefined, fetchFn);
   },
 
   create(data: ScheduleCreate): Promise<Schedule> {

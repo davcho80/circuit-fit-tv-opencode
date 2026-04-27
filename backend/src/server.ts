@@ -220,6 +220,15 @@ async function start(): Promise<void> {
     await prisma.$connect();
     app.log.info('Database connected');
 
+    // Marquer ABORTED les sessions laissées RUNNING/PAUSED par un crash précédent
+    const orphaned = await prisma.session.updateMany({
+      where: { status: { in: ['RUNNING', 'PAUSED'] } },
+      data:  { status: 'ABORTED', endedAt: new Date() },
+    });
+    if (orphaned.count > 0) {
+      app.log.warn({ count: orphaned.count }, 'Orphaned sessions marked ABORTED');
+    }
+
     await ensureBuckets();
     app.log.info('Storage buckets ready');
 
