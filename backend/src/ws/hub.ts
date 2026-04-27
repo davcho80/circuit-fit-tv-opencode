@@ -79,11 +79,21 @@ class WsHub {
 
   clientList() {
     return this.all().map((c) => ({
-      id: c.id,
-      role: c.role,
-      label: c.label,
+      id:          c.id,
+      role:        c.role,
+      label:       c.label,
+      displayId:   c.displayId ?? null,
       connectedAt: c.connectedAt,
     }));
+  }
+
+  /** Retourne les displayIds des TV actuellement connectées */
+  onlineDisplayIds(): Set<string> {
+    return new Set(
+      this.all()
+        .filter((c) => c.role === 'tv' && c.displayId)
+        .map((c) => c.displayId as string),
+    );
   }
 }
 

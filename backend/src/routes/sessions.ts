@@ -19,7 +19,11 @@ import { orchestrator } from '../sessions/orchestrator.js';
 export async function sessionsRoutes(app: FastifyInstance): Promise<void> {
   // GET /sessions
   app.get('/sessions', async () => {
-    return prisma.session.findMany({ orderBy: { startedAt: 'desc' }, take: 50 });
+    return prisma.session.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: 100,
+      include: { circuit: { select: { name: true } } },
+    });
   });
 
   // GET /sessions/active

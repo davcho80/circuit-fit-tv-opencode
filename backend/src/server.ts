@@ -12,6 +12,7 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import websocket from '@fastify/websocket';
 import multipart from '@fastify/multipart';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -58,6 +59,14 @@ await app.register(cors, {
 });
 await app.register(websocket);
 await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2 GB max
+await app.register(rateLimit, {
+  global:      true,
+  max:         200,          // requêtes par fenêtre
+  timeWindow:  '1 minute',
+  skipOnError: true,
+  // Ne pas appliquer sur le WS ni sur les assets statiques
+  allowList: (req, _key) => req.url === '/ws' || req.url.startsWith('/assets'),
+});
 
 // ---- Fichiers statiques PWA ----
 // En production : sert le build SvelteKit depuis pwa/build/
@@ -82,13 +91,31 @@ if (!config.isDev && existsSync(PWA_BUILD)) {
 
 // ---- Routes REST ----
 
-app.get('/health', () => ({
-  status: 'ok',
-  service: 'circuit-fit-tv-backend',
-  version: '0.1.0',
-  time: new Date().toISOString(),
-  clients: hub.all().length,
-}));
+app.get('/health', async () => {
+  // Vérifier DB
+  let dbOk = false;
+  try { await prisma.$queryRaw`SELECT 1`; dbOk = true; } catch { /* db down */ }
+
+  const clients = hub.all();
+  return {
+    status:  dbOk ? 'ok' : 'degraded',
+    service: 'circuit-fit-tv-backend',
+    version: '0.1.0',
+    time:    new Date().toISOString(),
+    db:      dbOk ? 'ok' : 'error',
+    ws: {
+      total:   clients.length,
+      coaches: clients.filter((c) => c.role === 'coach').length,
+      tvs:     clients.filter((c) => c.role === 'tv').length,
+    },
+    scheduler: stopScheduler !== null ? 'running' : 'stopped',
+  };
+});
+
+// GET /displays/online — displayIds actuellement connectés
+app.get('/displays/online', () => {
+  return { onlineIds: [...hub.onlineDisplayIds()] };
+});
 
 await app.register(exercisesRoutes);
 await app.register(circuitsRoutes);
@@ -132,7 +159,13 @@ app.get('/ws', { websocket: true }, (socket, req) => {
       hub.remove(client.id);
       client = hub.add(socket, role, label, displayId);
 
-      app.log.info({ clientId: client.id, role, label }, 'WS client registered');
+      app.log.info({ clientId: client.id, role, label, displayId }, 'WS client registered');
+
+      // Mettre à jour lastSeen à la connexion d'un écran TV appairé
+      if (role === 'tv' && displayId) {
+        prisma.display.update({ where: { id: displayId }, data: { lastSeen: new Date() } })
+          .catch(() => { /* display peut avoir été supprimé */ });
+      }
 
       // WELCOME
       hub.send(client, {

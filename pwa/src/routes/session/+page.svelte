@@ -81,15 +81,46 @@
   const ROLE_ICON: Record<string, string> = {
     tv: '📺', coach: '🎯', monitor: '👁',
   };
+
+  // ---- Raccourcis clavier ----
+  function onKeydown(e: KeyboardEvent) {
+    // Ignorer si focus sur un input/select/textarea
+    if ((e.target as HTMLElement).closest('input, select, textarea, button')) return;
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!session) return;
+      if (session.status === 'RUNNING') pause();
+      else resume();
+    } else if (e.code === 'KeyS' && session) {
+      skip();
+    } else if (e.code === 'Escape' && session) {
+      stop();
+    }
+  }
 </script>
 
 <svelte:head>
   <title>Session live — Circuit Fit TV</title>
 </svelte:head>
 
+<svelte:window onkeydown={onKeydown} />
+
 <div class="p-6 max-w-5xl mx-auto space-y-6">
+
+  <!-- Bannière session démarrée automatiquement -->
+  {#if conn.schedulerFiredAt}
+    <div class="flex items-center gap-3 bg-sky-900/40 border border-sky-700/50 rounded-xl px-4 py-3 text-sky-200 text-sm">
+      <span class="text-lg">📅</span>
+      <span class="font-medium">Session démarrée automatiquement par le calendrier</span>
+    </div>
+  {/if}
+
   <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold text-slate-100">Session live</h1>
+    <div>
+      <h1 class="text-2xl font-bold text-slate-100">Session live</h1>
+      <p class="text-slate-500 text-xs mt-0.5">Espace: pause/play · S: skip · Échap: arrêter</p>
+    </div>
     <span class="flex items-center gap-2 text-sm">
       <span
         class="inline-block w-2 h-2 rounded-full {conn.connected ? 'bg-green-400' : 'bg-red-400'}"
@@ -97,6 +128,7 @@
       <span class="text-slate-400">{conn.connected ? 'Connecté' : 'Reconnexion…'}</span>
     </span>
   </div>
+
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 

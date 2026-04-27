@@ -238,6 +238,11 @@ fun TvScreen(uiState: TvViewModel.UiState, onDisconnect: () -> Unit) {
         if (hydrationSec > 0) {
             HydrationBreakOverlay(remainingSec = hydrationSec)
         }
+
+        // ── Overlay fin de session ───────────────────────────────
+        uiState.sessionEndedReason?.let { reason ->
+            SessionEndedOverlay(reason = reason)
+        }
     }
 }
 
@@ -474,7 +479,16 @@ private fun ExerciseCard(
                 maxLines = 3,
             )
 
-            if (showMuscles && exercise.muscleGroups.isNotEmpty()) {
+            if (showMuscles && !exercise.description.isNullOrBlank()) {
+                Text(
+                    text = exercise.description,
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.55f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else if (showMuscles && exercise.muscleGroups.isNotEmpty()) {
                 Text(
                     text = exercise.muscleGroups.joinToString(" · "),
                     fontSize = 13.sp,
@@ -748,6 +762,11 @@ private fun DashboardScreen(uiState: TvViewModel.UiState, onDisconnect: () -> Un
         if (hydrationSec > 0) {
             HydrationBreakOverlay(remainingSec = hydrationSec)
         }
+
+        // ── Overlay fin de session ───────────────────────────────
+        uiState.sessionEndedReason?.let { reason ->
+            SessionEndedOverlay(reason = reason)
+        }
     }
 }
 
@@ -875,6 +894,46 @@ private fun WaterBottleIcon(modifier: Modifier, tint: Color) {
             size = Size(8.dp.toPx(), 24.dp.toPx()),
             cornerRadius = CornerRadius(4.dp.toPx()),
         )
+    }
+}
+
+// ── Overlay fin de session ───────────────────────────────────
+
+@Composable
+fun SessionEndedOverlay(reason: String) {
+    val isCompleted = reason == "completed"
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xF00F172A)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(48.dp),
+        ) {
+            Text(
+                text = if (isCompleted) "🎉" else "⏹",
+                fontSize = 80.sp,
+            )
+            Text(
+                text = if (isCompleted) "SESSION TERMINÉE !" else "SESSION ARRÊTÉE",
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 4.sp,
+                color = if (isCompleted) Color(0xFF34D399) else Color(0xFF94A3B8),
+                textAlign = TextAlign.Center,
+            )
+            if (isCompleted) {
+                Text(
+                    text = "Bravo ! Tous les rounds ont été complétés.",
+                    fontSize = 18.sp,
+                    color = Color.White.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }
 

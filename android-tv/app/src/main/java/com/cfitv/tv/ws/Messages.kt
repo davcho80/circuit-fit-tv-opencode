@@ -97,6 +97,7 @@ data class StationExerciseEntry(
 data class ExerciseData(
     val id: String,
     val name: String,
+    val description: String? = null,
     val muscleGroups: List<String> = emptyList(),
     val equipment: List<String> = emptyList(),
 )

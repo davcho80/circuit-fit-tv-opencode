@@ -54,6 +54,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val remainingSec: Int         = 0,
         val progressFrac: Float       = 0f,
         val hydrationRemainingSec: Int = 0,
+        val sessionEndedReason: String? = null,  // "completed" | "stopped" | null
     ) {
         enum class Screen { SETUP, DISPLAY }
 
@@ -363,7 +364,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 is ServerMessage.SessionUpdate -> {
                     val session = msg.payload
-                    _ui.update { it.copy(session = session) }
+                    _ui.update { it.copy(session = session, sessionEndedReason = null) }
                     if (session != null) {
                         updateMyWorkState(session)
                         fetchCircuitIfNeeded(session.circuitId)
@@ -372,11 +373,17 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 is ServerMessage.SessionEnded -> {
                     lastFetchedCircuitId = ""
                     _ui.update { it.copy(
-                        session = null,
-                        circuit = null,
-                        isMyWork = false,
-                        myExercises = emptyList(),
+                        session             = null,
+                        circuit             = null,
+                        isMyWork            = false,
+                        myExercises         = emptyList(),
+                        sessionEndedReason  = msg.reason,
                     )}
+                    // Effacer l'overlay après 6 secondes
+                    viewModelScope.launch {
+                        delay(6_000)
+                        _ui.update { it.copy(sessionEndedReason = null) }
+                    }
                 }
                 is PairConfig -> {
                     // Config reçue de la console → sauvegarder et démarrer l'affichage

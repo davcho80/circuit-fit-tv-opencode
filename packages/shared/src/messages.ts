@@ -171,12 +171,20 @@ export const ClientListMsg = z.object({
   type: z.literal('CLIENT_LIST'),
   payload: z.array(
     z.object({
-      id: z.string().uuid(),
-      role: z.string(),
-      label: z.string(),
+      id:          z.string().uuid(),
+      role:        z.string(),
+      label:       z.string(),
+      displayId:   z.string().nullable(),
       connectedAt: z.number().int(),
     }),
   ),
+});
+
+// Notification : le scheduler a démarré une session automatiquement
+export const SessionAutoStartedMsg = z.object({
+  type:         z.literal('SESSION_AUTO_STARTED'),
+  scheduleId:   z.string().uuid(),
+  scheduleName: z.string(),
 });
 
 // Relais de télémétrie drift vers le coach / monitor
@@ -217,6 +225,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   CircuitStateMsg,
   SessionEndedMsg,
   ClientListMsg,
+  SessionAutoStartedMsg,
   DriftDataMsg,
   ErrorMsg,
   PairConfigMsg,

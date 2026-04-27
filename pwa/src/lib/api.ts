@@ -217,6 +217,26 @@ export const circuits = {
   },
 };
 
+// ---- Types Session ----
+
+export type SessionStatus = 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'ABORTED';
+
+export interface SessionHistory {
+  id:            string;
+  circuitId:     string;
+  circuit:       { name: string };
+  startedAt:     string;
+  endedAt:       string | null;
+  status:        SessionStatus;
+  currentRound:  number;
+}
+
+export const sessions = {
+  list(): Promise<SessionHistory[]> {
+    return request('GET', '/sessions');
+  },
+};
+
 // ---- Types Display ----
 
 export type DisplayRole = 'STATION' | 'CENTRAL' | 'UNASSIGNED';

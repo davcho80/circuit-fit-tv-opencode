@@ -11,7 +11,7 @@ const WS_URL = (import.meta.env['VITE_API_URL'] as string | undefined ?? 'http:/
 
 // ---- Types publics ----
 
-export type PhaseType = 'WORK' | 'REST' | 'TRANSITION';
+export type PhaseType = 'WORK' | 'REST' | 'TRANSITION' | 'HYDRATION';
 
 export interface SessionPayload {
   id: string;
@@ -31,9 +31,10 @@ export interface SessionPayload {
 }
 
 export interface ClientInfo {
-  id: string;
-  role: string;
-  label: string;
+  id:          string;
+  role:        string;
+  label:       string;
+  displayId:   string | null;
   connectedAt: number;
 }
 
@@ -46,6 +47,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
   let clockOffset = $state(0); // serverNow = Date.now() + clockOffset
   let clientList = $state<ClientInfo[]>([]);
   let sessionEndedReason = $state<string | null>(null);
+  let schedulerFiredAt = $state<number | null>(null); // timestamp dernière session auto
 
   let ws: WebSocket | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -104,7 +106,15 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
       }
       case 'SESSION_UPDATE':
         session = (msg['payload'] as SessionPayload | null) ?? null;
-        sessionEndedReason = null; // reset si on reçoit un update
+        if (session && !sessionEndedReason) {
+          // Détection auto-start : session qui arrive sans que le coach ait envoyé START
+          // Le backend envoie SESSION_AUTO_STARTED séparément
+        }
+        sessionEndedReason = null;
+        break;
+      case 'SESSION_AUTO_STARTED':
+        schedulerFiredAt = Date.now();
+        setTimeout(() => { schedulerFiredAt = null; }, 8_000); // masquer après 8s
         break;
       case 'SESSION_ENDED':
         session = null;
@@ -157,7 +167,8 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
     get session()            { return session; },
     get clockOffset()        { return clockOffset; },
     get clientList()         { return clientList; },
-    get sessionEndedReason() { return sessionEndedReason; },
+    get sessionEndedReason()  { return sessionEndedReason; },
+    get schedulerFiredAt()    { return schedulerFiredAt; },
     serverNow,
     send,
     destroy,

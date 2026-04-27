@@ -6,6 +6,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { prisma } from '../db.js';
 import { orchestrator } from './orchestrator.js';
+import { hub } from '../ws/hub.js';
 
 // ---- Helpers timezone ----
 
@@ -104,6 +105,12 @@ export function startScheduler(log: FastifyBaseLogger): () => void {
           await prisma.schedule.update({
             where: { id: sched.id },
             data:  { lastFiredAt: new Date() },
+          });
+          // Notifier les coaches qu'une session a démarré automatiquement
+          hub.broadcastToCoaches({
+            type:         'SESSION_AUTO_STARTED',
+            scheduleId:   sched.id,
+            scheduleName: sched.name,
           });
         } catch (err) {
           log.error({ scheduleId: sched.id, err }, 'Scheduler: échec du démarrage');

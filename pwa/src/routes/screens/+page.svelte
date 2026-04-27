@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { invalidateAll } from '$app/navigation';
+  import { onDestroy } from 'svelte';
   import { displays as api, type Display, type DisplayRole } from '$lib/api.js';
 
   let { data } = $props();
@@ -121,6 +122,14 @@
     UNASSIGNED: '❓',
   };
 
+  // ════ Refresh automatique toutes les 20s ════
+  const refreshTimer = setInterval(() => invalidateAll(), 20_000);
+  onDestroy(() => clearInterval(refreshTimer));
+
+  function isOnline(d: Display): boolean {
+    return data.onlineIds.has(d.id);
+  }
+
   function lastSeenLabel(iso: string | null): string {
     if (!iso) return 'Jamais vu';
     const diff = Date.now() - new Date(iso).getTime();
@@ -159,6 +168,11 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-semibold text-slate-100">{d.name}</span>
+                <!-- Indicateur en ligne -->
+                <span class="flex items-center gap-1 text-xs font-medium">
+                  <span class="w-1.5 h-1.5 rounded-full {isOnline(d) ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
+                  <span class="{isOnline(d) ? 'text-emerald-400' : 'text-slate-500'}">{isOnline(d) ? 'En ligne' : 'Hors ligne'}</span>
+                </span>
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium
                   {d.role === 'STATION'    ? 'bg-sky-900/50 text-sky-300' :
                    d.role === 'CENTRAL'    ? 'bg-violet-900/50 text-violet-300' :

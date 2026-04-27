@@ -8,6 +8,7 @@ import { hub } from './hub.js';
 import { handleClockPing } from './clock.js';
 import { orchestrator } from '../sessions/orchestrator.js';
 import { registerPin } from './pair.js';
+import { prisma } from '../db.js';
 
 export function handleMessage(client: ConnectedClient, raw: string): void {
   let parsed: unknown;
@@ -41,6 +42,13 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
 
     case 'HEARTBEAT':
       hub.send(client, { type: 'HEARTBEAT_ACK', serverTime: Date.now() });
+      // Mettre à jour lastSeen pour les écrans TV appairés
+      if (client.role === 'tv' && client.displayId) {
+        prisma.display.update({
+          where: { id: client.displayId },
+          data:  { lastSeen: new Date() },
+        }).catch(() => { /* display peut avoir été supprimé */ });
+      }
       break;
 
     case 'START':
