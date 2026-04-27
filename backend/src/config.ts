@@ -29,6 +29,11 @@ export const config = {
     bucketThumbnails: optional('S3_BUCKET_THUMBNAILS', 'thumbnails'),
   },
 
+  jwtSecret: optional('JWT_SECRET', 'cfitv_dev_jwt_secret_change_in_production_32c'),
+
+  adminEmail:           optional('ADMIN_EMAIL', ''),
+  adminInitialPassword: optional('ADMIN_INITIAL_PASSWORD', ''),
+
   get isDev(): boolean {
     return this.nodeEnv !== 'production';
   },

@@ -9,9 +9,17 @@
 const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
 
 async function request<T>(method: string, path: string, body?: unknown, fetchFn: typeof globalThis.fetch = globalThis.fetch): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // Injecter le token JWT si disponible (côté client uniquement)
+  if (typeof localStorage !== 'undefined') {
+    const token = localStorage.getItem('cfitv_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetchFn(`${BASE}${path}`, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
@@ -347,5 +355,68 @@ export const schedules = {
 
   delete(id: string): Promise<void> {
     return request('DELETE', `/schedules/${id}`);
+  },
+};
+
+// ---- Types Auth ----
+
+export interface UserPublic {
+  id:                 string;
+  email:              string;
+  role:               'ADMIN' | 'COACH';
+  mustChangePassword: boolean;
+  lastLoginAt:        string | null;
+  createdAt:          string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user:  UserPublic;
+}
+
+// ---- Auth ----
+
+export const auth = {
+  login(email: string, password: string): Promise<LoginResponse> {
+    return request('POST', '/auth/login', { email, password });
+  },
+
+  me(): Promise<UserPublic> {
+    return request('GET', '/auth/me');
+  },
+
+  changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return request('POST', '/auth/change-password', { currentPassword, newPassword });
+  },
+};
+
+// ---- Users ----
+
+export interface UserCreate {
+  email:    string;
+  password: string;
+  role:     'ADMIN' | 'COACH';
+}
+
+export interface UserPatch {
+  role?:     'ADMIN' | 'COACH';
+  password?: string;
+}
+
+export const users = {
+  list(): Promise<UserPublic[]> {
+    return request('GET', '/users');
+  },
+
+  create(data: UserCreate): Promise<UserPublic> {
+    return request('POST', '/users', data);
+  },
+
+  patch(id: string, data: UserPatch): Promise<UserPublic> {
+    return request('PATCH', `/users/${id}`, data);
+  },
+
+  delete(id: string): Promise<void> {
+    return request('DELETE', `/users/${id}`);
   },
 };

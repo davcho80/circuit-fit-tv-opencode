@@ -38,6 +38,10 @@ import { sessionsRoutes } from './routes/sessions.js';
 import { pairRoutes } from './routes/pair.js';
 import { schedulesRoutes } from './routes/schedules.js';
 import { statsRoutes } from './routes/stats.js';
+import { authRoutes } from './routes/auth.js';
+import { usersRoutes } from './routes/users.js';
+import { jwtFastifyPlugin, requireAuth } from './auth/jwt.plugin.js';
+import { bootstrapAdmin } from './auth/bootstrap.js';
 import { startScheduler } from './sessions/scheduler.js';
 import { removeByClient } from './ws/pair.js';
 
@@ -58,6 +62,25 @@ await app.register(cors, {
     : false,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
+// JWT — doit être enregistré avant les routes protégées
+await app.register(jwtFastifyPlugin);
+
+// Hook d'auth global avec liste blanche
+// Routes exemptes : /health, /auth/*, /pair/*, /ws, assets statiques
+// Routes accessibles sans token (TV self-registration, WS, assets)
+const AUTH_EXEMPT_EXACT   = new Set(['/health', '/displays/online', '/displays']);
+const AUTH_EXEMPT_PREFIXES = ['/auth/', '/pair/', '/ws', '/displays/', '/assets/', '/_app/', '/favicon'];
+
+app.addHook('onRequest', async (req, reply) => {
+  const rawUrl: string = req.url ?? '';
+  const url = rawUrl.split('?')[0] ?? '';
+  if (AUTH_EXEMPT_EXACT.has(url))                          return;
+  if (AUTH_EXEMPT_PREFIXES.some((p) => url.startsWith(p))) return;
+  // En prod : laisser passer les assets statiques SPA
+  if (url === '/' || url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css')) return;
+  await requireAuth(req, reply);
+});
+
 await app.register(websocket);
 await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2 GB max
 await app.register(rateLimit, {
@@ -125,6 +148,8 @@ await app.register(sessionsRoutes);
 await app.register(pairRoutes);
 await app.register(schedulesRoutes);
 await app.register(statsRoutes);
+await app.register(authRoutes);
+await app.register(usersRoutes);
 
 // ---- WebSocket endpoint ----
 
@@ -221,6 +246,8 @@ async function start(): Promise<void> {
   try {
     await prisma.$connect();
     app.log.info('Database connected');
+
+    await bootstrapAdmin();
 
     // Marquer ABORTED les sessions laissées RUNNING/PAUSED par un crash précédent
     const orphaned = await prisma.session.updateMany({

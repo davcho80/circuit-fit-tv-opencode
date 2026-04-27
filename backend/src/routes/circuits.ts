@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CircuitCreate } from '@cfitv/shared';
 import { prisma } from '../db.js';
+import { requireAdmin } from '../auth/jwt.plugin.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function stripUndefined(obj: Record<string, unknown>): any {
@@ -41,7 +42,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /circuits
-  app.post('/circuits', async (req, reply) => {
+  app.post('/circuits', { preHandler: [requireAdmin] }, async (req, reply) => {
     const body = CircuitCreate.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
@@ -71,7 +72,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH /circuits/:id
-  app.patch<{ Params: { id: string } }>('/circuits/:id', async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/circuits/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.circuit.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Circuit not found' });
 
@@ -90,7 +91,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PUT /circuits/:id/breaks — remplace toutes les pauses programmées du circuit
-  app.put<{ Params: { id: string } }>('/circuits/:id/breaks', async (req, reply) => {
+  app.put<{ Params: { id: string } }>('/circuits/:id/breaks', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.circuit.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Circuit not found' });
 
@@ -124,7 +125,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PUT /circuits/:id/stations — remplace toutes les stations du circuit
-  app.put<{ Params: { id: string } }>('/circuits/:id/stations', async (req, reply) => {
+  app.put<{ Params: { id: string } }>('/circuits/:id/stations', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.circuit.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Circuit not found' });
 
@@ -163,7 +164,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH /circuits/:id/layout — met à jour uniquement les positions x/y des stations
-  app.patch<{ Params: { id: string } }>('/circuits/:id/layout', async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/circuits/:id/layout', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.circuit.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Circuit not found' });
 
@@ -192,7 +193,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // DELETE /circuits/:id
-  app.delete<{ Params: { id: string } }>('/circuits/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/circuits/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.circuit.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Circuit not found' });
 

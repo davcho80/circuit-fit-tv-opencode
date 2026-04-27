@@ -35,6 +35,53 @@ export type SessionStatus = z.infer<typeof SessionStatus>;
 export const PhaseType = z.enum(['TRANSITION', 'WORK', 'REST', 'HYDRATION']);
 export type PhaseType = z.infer<typeof PhaseType>;
 
+export const UserRole = z.enum(['ADMIN', 'COACH']);
+export type UserRole = z.infer<typeof UserRole>;
+
+// Politique de mot de passe partagée frontend + backend
+export const PasswordPolicy = z
+  .string()
+  .min(12, 'Minimum 12 caractères')
+  .regex(/[A-Z]/, 'Doit contenir une majuscule')
+  .regex(/[a-z]/, 'Doit contenir une minuscule')
+  .regex(/[0-9]/, 'Doit contenir un chiffre')
+  .regex(/[^A-Za-z0-9]/, 'Doit contenir un caractère spécial');
+
+export const UserPublic = z.object({
+  id:                 z.string().uuid(),
+  email:              z.string().email(),
+  role:               UserRole,
+  mustChangePassword: z.boolean(),
+  lastLoginAt:        z.string().datetime().nullable(),
+  createdAt:          z.string().datetime(),
+});
+export type UserPublic = z.infer<typeof UserPublic>;
+
+export const LoginBody = z.object({
+  email:    z.string().email(),
+  password: z.string().min(1),
+});
+export type LoginBody = z.infer<typeof LoginBody>;
+
+export const ChangePasswordBody = z.object({
+  currentPassword: z.string().min(1),
+  newPassword:     PasswordPolicy,
+});
+export type ChangePasswordBody = z.infer<typeof ChangePasswordBody>;
+
+export const UserCreate = z.object({
+  email:    z.string().email(),
+  password: PasswordPolicy,
+  role:     UserRole.default('COACH'),
+});
+export type UserCreate = z.infer<typeof UserCreate>;
+
+export const UserPatch = z.object({
+  role:     UserRole.optional(),
+  password: PasswordPolicy.optional(),
+}).refine((d) => d.role !== undefined || d.password !== undefined, 'At least one field required');
+export type UserPatch = z.infer<typeof UserPatch>;
+
 // ----- Exercise -----
 
 export const Exercise = z.object({

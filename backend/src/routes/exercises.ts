@@ -12,6 +12,7 @@ import type { FastifyInstance } from 'fastify';
 import { ExerciseCreate } from '@cfitv/shared';
 import { prisma } from '../db.js';
 import { processVideoUpload } from '../exercises/video.js';
+import { requireAdmin } from '../auth/jwt.plugin.js';
 
 // Retire les clés undefined et caste vers le type Prisma attendu.
 // Nécessaire car Zod .partial() produit { key?: T | undefined } mais Prisma
@@ -44,7 +45,7 @@ export async function exercisesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /exercises
-  app.post('/exercises', async (req, reply) => {
+  app.post('/exercises', { preHandler: [requireAdmin] }, async (req, reply) => {
     const body = ExerciseCreate.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
@@ -60,7 +61,7 @@ export async function exercisesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH /exercises/:id
-  app.patch<{ Params: { id: string } }>('/exercises/:id', async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/exercises/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.exercise.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Exercise not found' });
 
@@ -72,7 +73,7 @@ export async function exercisesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // DELETE /exercises/:id
-  app.delete<{ Params: { id: string } }>('/exercises/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/exercises/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.exercise.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Exercise not found' });
 
@@ -81,7 +82,7 @@ export async function exercisesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /exercises/:id/video  — upload multipart → FFmpeg → MinIO
-  app.post<{ Params: { id: string } }>('/exercises/:id/video', async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/exercises/:id/video', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.exercise.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Exercise not found' });
 

@@ -9,6 +9,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
+import { requireAdmin } from '../auth/jwt.plugin.js';
 
 const ScheduleBody = z.object({
   circuitId:  z.string().uuid(),
@@ -37,7 +38,7 @@ export async function schedulesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /schedules
-  app.post('/schedules', async (req, reply) => {
+  app.post('/schedules', { preHandler: [requireAdmin] }, async (req, reply) => {
     const body = ScheduleBody.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
@@ -66,7 +67,7 @@ export async function schedulesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH /schedules/:id
-  app.patch<{ Params: { id: string } }>('/schedules/:id', async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/schedules/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.schedule.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Schedule introuvable' });
 
@@ -95,7 +96,7 @@ export async function schedulesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // DELETE /schedules/:id
-  app.delete<{ Params: { id: string } }>('/schedules/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/schedules/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.schedule.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Schedule introuvable' });
 

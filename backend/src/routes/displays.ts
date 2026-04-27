@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Display } from '@cfitv/shared';
 import { prisma } from '../db.js';
+import { requireAdmin } from '../auth/jwt.plugin.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function stripUndefined(obj: Record<string, unknown>): any {
@@ -65,7 +66,7 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH /displays/:id
-  app.patch<{ Params: { id: string } }>('/displays/:id', async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/displays/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.display.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Display not found' });
 
@@ -77,7 +78,7 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // DELETE /displays/:id
-  app.delete<{ Params: { id: string } }>('/displays/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/displays/:id', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.display.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Display not found' });
 
