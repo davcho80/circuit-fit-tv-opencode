@@ -1,0 +1,4 @@
+-keep class com.cfitv.tv.ws.** { *; }
+-keepattributes *Annotation*, Signature, Exception
+-dontwarn okhttp3.**
+-dontwarn okio.**

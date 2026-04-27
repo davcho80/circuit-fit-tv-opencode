@@ -23,12 +23,15 @@ interface ActiveSession {
   sessionId: string;
   circuitId: string;
   phases: Phase[];
+  totalRounds: number;
   currentPhaseIdx: number;
   phaseStartsAt: number;
   phaseEndsAt: number;
   pausedAt: number | null;
   remainingOnPauseMs: number | null;
   timer: ReturnType<typeof setTimeout> | null;
+  hydrationBreakEndsAt: number | null;
+  hydrationBreakTimer: ReturnType<typeof setTimeout> | null;
 }
 
 class SessionOrchestrator {
@@ -44,6 +47,7 @@ class SessionOrchestrator {
           orderBy: { position: 'asc' },
           include: { exercises: { include: { exercise: true } } },
         },
+        scheduledBreaks: { orderBy: { afterRound: 'asc' } },
       },
     });
 
@@ -67,12 +71,15 @@ class SessionOrchestrator {
       sessionId: session.id,
       circuitId,
       phases,
+      totalRounds: circuit.rounds,
       currentPhaseIdx: 0,
       phaseStartsAt: now,
       phaseEndsAt: now + firstPhase.durationMs,
       pausedAt: null,
       remainingOnPauseMs: null,
       timer: null,
+      hydrationBreakEndsAt: null,
+      hydrationBreakTimer: null,
     };
 
     this.scheduleNext(firstPhase.durationMs);
@@ -100,6 +107,13 @@ class SessionOrchestrator {
   resume(): void {
     if (!this.active || this.active.pausedAt === null) return;
 
+    // Annule la pause eau si elle était en cours
+    if (this.active.hydrationBreakTimer) {
+      clearTimeout(this.active.hydrationBreakTimer);
+      this.active.hydrationBreakTimer = null;
+    }
+    this.active.hydrationBreakEndsAt = null;
+
     const remaining = this.active.remainingOnPauseMs ?? 0;
     const now = Date.now();
     this.active.phaseStartsAt = now;
@@ -113,6 +127,39 @@ class SessionOrchestrator {
     });
 
     this.scheduleNext(remaining);
+    this.broadcastSessionUpdate();
+  }
+
+  hydrationBreak(durationMs: number): void {
+    if (!this.active) return;
+
+    // Annule un break eau déjà actif
+    if (this.active.hydrationBreakTimer) {
+      clearTimeout(this.active.hydrationBreakTimer);
+      this.active.hydrationBreakTimer = null;
+    }
+
+    // Pause la phase si elle tourne
+    if (this.active.pausedAt === null) {
+      if (this.active.timer) clearTimeout(this.active.timer);
+      this.active.timer = null;
+      this.active.pausedAt = Date.now();
+      this.active.remainingOnPauseMs = Math.max(0, this.active.phaseEndsAt - this.active.pausedAt);
+      void prisma.session.update({
+        where: { id: this.active.sessionId },
+        data: { status: 'PAUSED', pausedAt: new Date(this.active.pausedAt), remainingOnPauseMs: this.active.remainingOnPauseMs },
+      });
+    }
+
+    this.active.hydrationBreakEndsAt = Date.now() + durationMs;
+
+    this.active.hydrationBreakTimer = setTimeout(() => {
+      if (!this.active) return;
+      this.active.hydrationBreakEndsAt = null;
+      this.active.hydrationBreakTimer = null;
+      this.resume();
+    }, durationMs);
+
     this.broadcastSessionUpdate();
   }
 
@@ -142,6 +189,31 @@ class SessionOrchestrator {
 
   getState(): ActiveSession | null {
     return this.active;
+  }
+
+  /** Retourne le message SESSION_UPDATE courant (pour l'envoyer aux nouveaux clients) */
+  getSessionUpdateMsg(): { type: 'SESSION_UPDATE'; payload: unknown } {
+    if (!this.active) return { type: 'SESSION_UPDATE', payload: null };
+    const phase = this.active.phases[this.active.currentPhaseIdx]!;
+    return {
+      type: 'SESSION_UPDATE',
+      payload: {
+        id: this.active.sessionId,
+        status: this.active.pausedAt !== null ? 'PAUSED' : 'RUNNING',
+        circuitId: this.active.circuitId,
+        currentPhaseIdx: this.active.currentPhaseIdx,
+        totalPhases: this.active.phases.length,
+        round: phase.round,
+        totalRounds: this.active.totalRounds,
+        stationIdx: phase.stationIdx,
+        phase: { type: phase.type, label: phase.label, durationMs: phase.durationMs },
+        phaseStartsAt: this.active.phaseStartsAt,
+        phaseEndsAt: this.active.phaseEndsAt,
+        pausedAt: this.active.pausedAt,
+        remainingOnPauseMs: this.active.remainingOnPauseMs,
+        hydrationBreakEndsAt: this.active.hydrationBreakEndsAt,
+      },
+    };
   }
 
   private scheduleNext(ms: number): void {
@@ -187,6 +259,7 @@ class SessionOrchestrator {
     if (!this.active) return;
 
     if (this.active.timer) clearTimeout(this.active.timer);
+    if (this.active.hydrationBreakTimer) clearTimeout(this.active.hydrationBreakTimer);
     const sessionId = this.active.sessionId;
     this.active = null;
 
@@ -213,6 +286,9 @@ class SessionOrchestrator {
         circuitId: this.active.circuitId,
         currentPhaseIdx: this.active.currentPhaseIdx,
         totalPhases: this.active.phases.length,
+        round: phase.round,
+        totalRounds: this.active.totalRounds,
+        stationIdx: phase.stationIdx,
         phase: {
           type: phase.type,
           label: phase.label,
@@ -222,6 +298,7 @@ class SessionOrchestrator {
         phaseEndsAt: this.active.phaseEndsAt,
         pausedAt: this.active.pausedAt,
         remainingOnPauseMs: this.active.remainingOnPauseMs,
+        hydrationBreakEndsAt: this.active.hydrationBreakEndsAt,
       },
     });
   }
@@ -236,11 +313,18 @@ type CircuitWithStations = Awaited<
     position: number;
     exercises: Array<{ exercise: { name: string } }>;
   }>;
+  scheduledBreaks: Array<{ afterRound: number; durationSec: number; label: string }>;
 };
 
 function buildPhases(circuit: CircuitWithStations): Phase[] {
   const phases: Phase[] = [];
   const stationCount = circuit.stations.length;
+
+  // Index des pauses par round
+  const breaksByRound = new Map<number, { durationSec: number; label: string }>();
+  for (const b of circuit.scheduledBreaks) {
+    breaksByRound.set(b.afterRound, { durationSec: b.durationSec, label: b.label });
+  }
 
   for (let round = 1; round <= circuit.rounds; round++) {
     for (let si = 0; si < stationCount; si++) {
@@ -278,6 +362,18 @@ function buildPhases(circuit: CircuitWithStations): Phase[] {
           round,
         });
       }
+    }
+
+    // Pause eau programmée après ce round (pas après le dernier round)
+    const brk = breaksByRound.get(round);
+    if (brk && round < circuit.rounds) {
+      phases.push({
+        type: 'HYDRATION',
+        label: brk.label,
+        durationMs: brk.durationSec * 1000,
+        stationIdx: 0,
+        round,
+      });
     }
   }
 

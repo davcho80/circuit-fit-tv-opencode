@@ -44,6 +44,7 @@ enum PhaseType {
   TRANSITION
   WORK
   REST
+  HYDRATION
 }
 
 // ----- Exercise -----
@@ -79,8 +80,40 @@ model Circuit {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  stations CircuitStation[]
-  sessions Session[]
+  stations        CircuitStation[]
+  sessions        Session[]
+  scheduledBreaks ScheduledBreak[]
+  schedules       Schedule[]
+}
+
+model Schedule {
+  id          String    @id @default(uuid())
+  circuit     Circuit   @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  circuitId   String
+  name        String    @db.VarChar(100)
+  daysOfWeek  Int[]                     // ISO 1=Lundi … 7=Dimanche
+  timeHour    Int                       // 0–23
+  timeMinute  Int                       // 0–59
+  timezone    String    @default("America/Montreal")
+  startDate   DateTime  @db.Date        // première semaine active
+  endDate     DateTime? @db.Date        // dernière semaine active (null = indéfini)
+  isActive    Boolean   @default(true)
+  lastFiredAt DateTime?                 // horodatage du dernier déclenchement
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+model ScheduledBreak {
+  id          String  @id @default(uuid())
+  circuit     Circuit @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  circuitId   String
+  afterRound  Int     // break se déclenche après avoir complété ce round (1-based)
+  durationSec Int     // durée de la pause en secondes
+  label       String  @default("Pause eau")
+
+  @@index([circuitId])
 }
 
 model CircuitStation {
@@ -88,6 +121,8 @@ model CircuitStation {
   circuit   Circuit @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   circuitId String
   position  Int
+  layoutX   Float?
+  layoutY   Float?
 
   exercises CircuitStationExercise[]
 
@@ -122,7 +157,7 @@ model Display {
 
 model Session {
   id                 String        @id @default(uuid())
-  circuit            Circuit       @relation(fields: [circuitId], references: [id])
+  circuit            Circuit       @relation(fields: [circuitId], references: [id], onDelete: Cascade)
   circuitId          String
   startedAt          DateTime      @default(now())
   endedAt            DateTime?

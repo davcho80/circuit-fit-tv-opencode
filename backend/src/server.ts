@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
+import { Bonjour } from 'bonjour-service';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // En production le build PWA est dans ../pwa/build (relatif au dist/)
@@ -28,10 +29,15 @@ import { ensureBuckets } from './storage.js';
 import { hub } from './ws/hub.js';
 import type { ClientRole } from './ws/hub.js';
 import { handleMessage } from './ws/handlers.js';
+import { orchestrator } from './sessions/orchestrator.js';
 import { exercisesRoutes } from './routes/exercises.js';
 import { circuitsRoutes } from './routes/circuits.js';
 import { displaysRoutes } from './routes/displays.js';
 import { sessionsRoutes } from './routes/sessions.js';
+import { pairRoutes } from './routes/pair.js';
+import { schedulesRoutes } from './routes/schedules.js';
+import { startScheduler } from './sessions/scheduler.js';
+import { removeByClient } from './ws/pair.js';
 
 // ---- Fastify instance ----
 
@@ -48,7 +54,7 @@ await app.register(cors, {
   origin: config.isDev
     ? ['http://localhost:5173', 'http://127.0.0.1:5173']
     : false,
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
 await app.register(websocket);
 await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } }); // 2 GB max
@@ -88,6 +94,8 @@ await app.register(exercisesRoutes);
 await app.register(circuitsRoutes);
 await app.register(displaysRoutes);
 await app.register(sessionsRoutes);
+await app.register(pairRoutes);
+await app.register(schedulesRoutes);
 
 // ---- WebSocket endpoint ----
 
@@ -133,6 +141,9 @@ app.get('/ws', { websocket: true }, (socket, req) => {
         serverTime: Date.now(),
       });
 
+      // Envoyer l'état courant de la session au nouveau client
+      hub.send(client, orchestrator.getSessionUpdateMsg() as import('@cfitv/shared').ServerMessage);
+
       // Diffuser la liste mise à jour au coach
       hub.broadcastToCoaches({ type: 'CLIENT_LIST', payload: hub.clientList() });
       return;
@@ -144,6 +155,7 @@ app.get('/ws', { websocket: true }, (socket, req) => {
   socket.on('close', () => {
     clearTimeout(registerTimeout);
     app.log.info({ clientId: client.id }, 'WS client disconnected');
+    removeByClient(client.id);   // nettoyage PIN d'appairage si en cours
     hub.remove(client.id);
     hub.broadcastToCoaches({ type: 'CLIENT_LIST', payload: hub.clientList() });
   });
@@ -155,8 +167,11 @@ app.get('/ws', { websocket: true }, (socket, req) => {
 
 // ---- Graceful shutdown ----
 
+let stopScheduler: (() => void) | null = null;
+
 async function shutdown(): Promise<void> {
   app.log.info('Shutting down...');
+  stopScheduler?.();
   await app.close();
   await prisma.$disconnect();
   process.exit(0);
@@ -176,6 +191,27 @@ async function start(): Promise<void> {
     app.log.info('Storage buckets ready');
 
     await app.listen({ port: config.port, host: config.host });
+
+    // ── Scheduler : démarrage automatique des sessions planifiées ──
+    stopScheduler = startScheduler(app.log);
+
+    // ── mDNS : annonce le serveur sur le réseau local ──────────
+    // Permet aux TV Android de découvrir le serveur automatiquement
+    // via NsdManager sans saisir l'URL manuellement.
+    // Désactivé en production cloud (AWS) où mDNS ne traverse pas Internet.
+    if (config.isDev || process.env['MDNS_ENABLED'] === 'true') {
+      const bonjour = new Bonjour();
+      bonjour.publish({
+        name:     'Circuit Fit TV',
+        type:     'cfitv',
+        port:     config.port,
+        protocol: 'tcp',
+      });
+      app.log.info({ port: config.port }, 'mDNS service published (_cfitv._tcp)');
+
+      // Nettoyage propre à l'arrêt
+      process.on('beforeExit', () => bonjour.unpublishAll());
+    }
   } catch (err) {
     app.log.error(err);
     await prisma.$disconnect();

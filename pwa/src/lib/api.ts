@@ -117,3 +117,191 @@ export const exercises = {
     });
   },
 };
+
+// ---- Types Circuits ----
+
+export type RotationMode = 'CLASSIC' | 'FIXED';
+
+export interface CircuitStationData {
+  id: string;
+  circuitId: string;
+  position: number;
+  layoutX: number | null;
+  layoutY: number | null;
+  exercises: Array<{ exercise: Exercise }>;
+}
+
+export interface ScheduledBreak {
+  id?: string;
+  afterRound:  number;
+  durationSec: number;
+  label:       string;
+}
+
+export interface Circuit {
+  id: string;
+  name: string;
+  description: string | null;
+  rounds: number;
+  workSec: number;
+  restSec: number;
+  transitionSec: number;
+  rotationMode: RotationMode;
+  stations: CircuitStationData[];
+  scheduledBreaks: ScheduledBreak[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CircuitStationInput {
+  position: number;
+  exerciseIds: string[];
+  layoutX?: number | null;
+  layoutY?: number | null;
+}
+
+export interface CircuitCreate {
+  name: string;
+  description?: string | null;
+  rounds: number;
+  workSec: number;
+  restSec: number;
+  transitionSec: number;
+  rotationMode: RotationMode;
+  stations: CircuitStationInput[];
+  scheduledBreaks?: Array<{ afterRound: number; durationSec: number; label?: string }>;
+}
+
+// ---- Circuits ----
+
+export const circuits = {
+  list(): Promise<Circuit[]> {
+    return request('GET', '/circuits');
+  },
+
+  get(id: string): Promise<Circuit> {
+    return request('GET', `/circuits/${id}`);
+  },
+
+  create(data: CircuitCreate): Promise<Circuit> {
+    return request('POST', '/circuits', data);
+  },
+
+  update(id: string, data: Partial<Omit<CircuitCreate, 'stations'>>): Promise<Circuit> {
+    return request('PATCH', `/circuits/${id}`, data);
+  },
+
+  delete(id: string): Promise<void> {
+    return request('DELETE', `/circuits/${id}`);
+  },
+
+  updateLayout(
+    id: string,
+    stations: Array<{ id: string; layoutX: number; layoutY: number }>,
+  ): Promise<Circuit> {
+    return request('PATCH', `/circuits/${id}/layout`, { stations });
+  },
+
+  updateStations(
+    id: string,
+    stations: Array<{ position: number; exerciseIds: string[]; layoutX?: number | null; layoutY?: number | null }>,
+  ): Promise<Circuit> {
+    return request('PUT', `/circuits/${id}/stations`, { stations });
+  },
+
+  updateBreaks(
+    id: string,
+    breaks: Array<{ afterRound: number; durationSec: number; label?: string }>,
+  ): Promise<Circuit> {
+    return request('PUT', `/circuits/${id}/breaks`, { breaks });
+  },
+};
+
+// ---- Types Display ----
+
+export type DisplayRole = 'STATION' | 'CENTRAL' | 'UNASSIGNED';
+
+export interface Display {
+  id:            string;
+  name:          string;
+  role:          DisplayRole;
+  stationNumber: number | null;
+  lastSeen:      string | null;
+  deviceModel:   string | null;
+  deviceOs:      string | null;
+  appVersion:    string | null;
+  pairedAt:      string | null;
+}
+
+export interface DisplayPatch {
+  name?:          string;
+  role?:          DisplayRole;
+  stationNumber?: number | null;
+}
+
+// ---- Displays ----
+
+export const displays = {
+  list(): Promise<Display[]> {
+    return request('GET', '/displays');
+  },
+
+  update(id: string, data: DisplayPatch): Promise<Display> {
+    return request('PATCH', `/displays/${id}`, data);
+  },
+
+  delete(id: string): Promise<void> {
+    return request('DELETE', `/displays/${id}`);
+  },
+};
+
+// ---- Types Schedule ----
+
+export interface Schedule {
+  id:          string;
+  circuitId:   string;
+  circuit:     { name: string };
+  name:        string;
+  daysOfWeek:  number[];   // ISO 1=Lun…7=Dim
+  timeHour:    number;
+  timeMinute:  number;
+  timezone:    string;
+  startDate:   string;     // ISO date YYYY-MM-DD
+  endDate:     string | null;
+  isActive:    boolean;
+  lastFiredAt: string | null;
+  createdAt:   string;
+  updatedAt:   string;
+}
+
+export interface ScheduleCreate {
+  circuitId:   string;
+  name:        string;
+  daysOfWeek:  number[];
+  timeHour:    number;
+  timeMinute:  number;
+  timezone?:   string;
+  startDate:   string;
+  endDate?:    string | null;
+  isActive?:   boolean;
+}
+
+// ---- Schedules ----
+
+export const schedules = {
+  list(): Promise<Schedule[]> {
+    return request('GET', '/schedules');
+  },
+
+  create(data: ScheduleCreate): Promise<Schedule> {
+    return request('POST', '/schedules', data);
+  },
+
+  update(id: string, data: Partial<ScheduleCreate>): Promise<Schedule> {
+    return request('PATCH', `/schedules/${id}`, data);
+  },
+
+  delete(id: string): Promise<void> {
+    return request('DELETE', `/schedules/${id}`);
+  },
+};

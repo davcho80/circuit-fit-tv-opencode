@@ -7,6 +7,7 @@ import type { ConnectedClient } from './hub.js';
 import { hub } from './hub.js';
 import { handleClockPing } from './clock.js';
 import { orchestrator } from '../sessions/orchestrator.js';
+import { registerPin } from './pair.js';
 
 export function handleMessage(client: ConnectedClient, raw: string): void {
   let parsed: unknown;
@@ -77,6 +78,11 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
       orchestrator.adjust(msg.deltaMs);
       break;
 
+    case 'HYDRATION_BREAK':
+      if (client.role !== 'coach') break;
+      orchestrator.hydrationBreak(msg.durationMs);
+      break;
+
     case 'DRIFT_REPORT':
       // Relayer au coach et aux monitors
       hub.broadcastToCoaches({
@@ -90,6 +96,10 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
         rttMs: msg.rttMs,
         clientNow: msg.clientNow,
       });
+      break;
+
+    case 'PAIR_REGISTER':
+      registerPin(msg.pin, client);
       break;
   }
 }

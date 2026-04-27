@@ -32,7 +32,7 @@ export const SessionStatus = z.enum([
 ]);
 export type SessionStatus = z.infer<typeof SessionStatus>;
 
-export const PhaseType = z.enum(['TRANSITION', 'WORK', 'REST']);
+export const PhaseType = z.enum(['TRANSITION', 'WORK', 'REST', 'HYDRATION']);
 export type PhaseType = z.infer<typeof PhaseType>;
 
 // ----- Exercise -----
@@ -69,6 +69,8 @@ export const CircuitStation = z.object({
   id: z.string().uuid(),
   circuitId: z.string().uuid(),
   position: z.number().int().min(1),
+  layoutX: z.number().min(0).max(1).nullable().default(null),
+  layoutY: z.number().min(0).max(1).nullable().default(null),
   exerciseIds: z.array(z.string().uuid()).min(1),
 });
 export type CircuitStation = z.infer<typeof CircuitStation>;
@@ -88,6 +90,13 @@ export const Circuit = z.object({
 });
 export type Circuit = z.infer<typeof Circuit>;
 
+export const ScheduledBreak = z.object({
+  afterRound:  z.number().int().min(1).max(10),
+  durationSec: z.number().int().min(10).max(600),
+  label:       z.string().max(50).optional(),
+});
+export type ScheduledBreak = z.infer<typeof ScheduledBreak>;
+
 export const CircuitCreate = Circuit.omit({
   id: true,
   stations: true,
@@ -98,10 +107,13 @@ export const CircuitCreate = Circuit.omit({
     .array(
       CircuitStation.omit({ id: true, circuitId: true, position: true }).extend({
         position: z.number().int().min(1),
+        layoutX: z.number().min(0).max(1).nullable().optional(),
+        layoutY: z.number().min(0).max(1).nullable().optional(),
       }),
     )
     .min(2)
     .max(20),
+  scheduledBreaks: z.array(ScheduledBreak).max(9).optional(),
 });
 export type CircuitCreate = z.infer<typeof CircuitCreate>;
 

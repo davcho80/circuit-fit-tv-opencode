@@ -51,6 +51,10 @@ export const AdjustCommand = z.object({
   type: z.literal('ADJUST'),
   deltaMs: z.number().int(), // positif pour ajouter, négatif pour retirer
 });
+export const HydrationBreakCommand = z.object({
+  type: z.literal('HYDRATION_BREAK'),
+  durationMs: z.number().int().min(10_000).max(600_000), // 10 s → 10 min
+});
 
 // Télémétrie envoyée par les TV (utile pour la page drift et le debug)
 export const DriftReportMsg = z.object({
@@ -63,6 +67,12 @@ export const DriftReportMsg = z.object({
   clientNow: z.number().int(),
 });
 
+// TV → Serveur : enregistre un code PIN d'appairage
+export const PairRegisterMsg = z.object({
+  type: z.literal('PAIR_REGISTER'),
+  pin: z.string().length(4),
+});
+
 export const ClientMessage = z.discriminatedUnion('type', [
   RegisterMsg,
   ClockPingMsg,
@@ -73,7 +83,9 @@ export const ClientMessage = z.discriminatedUnion('type', [
   SkipCommand,
   StopCommand,
   AdjustCommand,
+  HydrationBreakCommand,
   DriftReportMsg,
+  PairRegisterMsg,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -110,6 +122,9 @@ export const SessionUpdateMsg = z.object({
       circuitId: z.string().uuid(),
       currentPhaseIdx: z.number().int(),
       totalPhases: z.number().int(),
+      round: z.number().int(),       // round courant (1-based)
+      totalRounds: z.number().int(), // nombre total de rounds
+      stationIdx: z.number().int(),  // index (0-based) de la station active
       phase: z.object({
         type: PhaseType,
         label: z.string(),
@@ -119,6 +134,7 @@ export const SessionUpdateMsg = z.object({
       phaseEndsAt: z.number().int(),
       pausedAt: z.number().int().nullable(),
       remainingOnPauseMs: z.number().int().nullable(),
+      hydrationBreakEndsAt: z.number().int().nullable().optional(),
     })
     .nullable(), // null quand il n'y a pas de session active
 });
@@ -183,6 +199,15 @@ export const ErrorMsg = z.object({
   message: z.string(),
 });
 
+// Serveur → TV : config poussée après validation du PIN par l'admin
+export const PairConfigMsg = z.object({
+  type: z.literal('PAIR_CONFIG'),
+  label: z.string().min(1).max(50),
+  stationNumber: z.number().int().min(1).max(20),
+  screenType: z.enum(['STATION', 'DASHBOARD']),
+  isLandscape: z.boolean(),
+});
+
 export const ServerMessage = z.discriminatedUnion('type', [
   WelcomeMsg,
   ClockPongMsg,
@@ -194,6 +219,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   ClientListMsg,
   DriftDataMsg,
   ErrorMsg,
+  PairConfigMsg,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 
