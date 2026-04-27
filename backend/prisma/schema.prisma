@@ -82,6 +82,7 @@ model Circuit {
   restSec        Int
   transitionSec  Int
   rotationMode   RotationMode
+  icon           String?      @db.VarChar(10)   // emoji ou court identifiant
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -173,6 +174,15 @@ model Session {
   phaseEndsAt        DateTime?
   pausedAt           DateTime?
   remainingOnPauseMs Int?
+}
+
+// ----- Studio Settings (singleton) -----
+
+model StudioSettings {
+  id           String  @id @default("singleton")
+  studioName   String  @default("Circuit Fit TV") @db.VarChar(100)
+  primaryColor String  @default("#0ea5e9") @db.VarChar(7)
+  logoUrl      String?
 }
 
 // ----- User -----

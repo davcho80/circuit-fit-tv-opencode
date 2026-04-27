@@ -46,11 +46,12 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
     const body = CircuitCreate.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
-    const { stations, scheduledBreaks, ...circuitData } = body.data;
+    const { stations, scheduledBreaks, icon, ...circuitData } = body.data;
 
     const circuit = await prisma.circuit.create({
       data: {
         ...circuitData,
+        icon: icon ?? null,
         stations: {
           create: stations.map((s) => ({
             position: s.position,

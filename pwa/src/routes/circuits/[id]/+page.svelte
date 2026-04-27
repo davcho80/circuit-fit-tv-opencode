@@ -19,6 +19,7 @@
     await api.update(circuit.id, {
       name:          payload.name,
       description:   payload.description,
+      icon:          payload.icon,
       rounds:        payload.rounds,
       workSec:       payload.workSec,
       restSec:       payload.restSec,

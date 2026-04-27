@@ -150,6 +150,7 @@ export interface Circuit {
   id: string;
   name: string;
   description: string | null;
+  icon: string | null;
   rounds: number;
   workSec: number;
   restSec: number;
@@ -171,6 +172,7 @@ export interface CircuitStationInput {
 export interface CircuitCreate {
   name: string;
   description?: string | null;
+  icon?: string | null;
   rounds: number;
   workSec: number;
   restSec: number;
@@ -195,7 +197,7 @@ export const circuits = {
     return request('POST', '/circuits', data);
   },
 
-  update(id: string, data: Partial<Omit<CircuitCreate, 'stations'>>): Promise<Circuit> {
+  update(id: string, data: Partial<Omit<CircuitCreate, 'stations' | 'scheduledBreaks'>>): Promise<Circuit> {
     return request('PATCH', `/circuits/${id}`, data);
   },
 
@@ -355,6 +357,53 @@ export const schedules = {
 
   delete(id: string): Promise<void> {
     return request('DELETE', `/schedules/${id}`);
+  },
+};
+
+// ---- Types Studio Settings ----
+
+export interface StudioSettings {
+  id:           string;
+  studioName:   string;
+  primaryColor: string;
+  logoUrl:      string | null;
+}
+
+export interface SettingsPatch {
+  studioName?:   string;
+  primaryColor?: string;
+  logoUrl?:      string | null;
+}
+
+// ---- Settings ----
+
+export const settings = {
+  get(fetchFn?: typeof globalThis.fetch): Promise<StudioSettings> {
+    return request('GET', '/settings', undefined, fetchFn);
+  },
+
+  patch(data: SettingsPatch): Promise<StudioSettings> {
+    return request('PATCH', '/settings', data);
+  },
+
+  uploadLogo(file: File, onProgress?: (pct: number) => void): Promise<StudioSettings> {
+    return new Promise((resolve, reject) => {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('cfitv_token') : null;
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}/settings/logo`);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText) as StudioSettings);
+        else reject(new Error(`Logo upload failed: ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      const form = new FormData();
+      form.append('file', file);
+      xhr.send(form);
+    });
   },
 };
 

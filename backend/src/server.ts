@@ -41,6 +41,8 @@ import { statsRoutes } from './routes/stats.js';
 import { authRoutes } from './routes/auth.js';
 import { usersRoutes } from './routes/users.js';
 import { setupRoutes } from './routes/setup.js';
+import { settingsRoutes } from './routes/settings.js';
+import { tvScheduleRoutes } from './routes/tv-schedule.js';
 import { jwtFastifyPlugin, requireAuth } from './auth/jwt.plugin.js';
 import { bootstrapAdmin } from './auth/bootstrap.js';
 import { startScheduler } from './sessions/scheduler.js';
@@ -70,7 +72,7 @@ await app.register(jwtFastifyPlugin);
 // Routes exemptes : /health, /auth/*, /pair/*, /ws, assets statiques
 // Routes accessibles sans token (TV self-registration, WS, assets)
 const AUTH_EXEMPT_EXACT   = new Set(['/health', '/displays/online', '/displays']);
-const AUTH_EXEMPT_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/displays/', '/assets/', '/_app/', '/favicon'];
+const AUTH_EXEMPT_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/displays/', '/settings', '/tv-schedule', '/assets/', '/_app/', '/favicon'];
 
 app.addHook('onRequest', async (req, reply) => {
   const rawUrl: string = req.url ?? '';
@@ -152,6 +154,8 @@ await app.register(statsRoutes);
 await app.register(authRoutes);
 await app.register(usersRoutes);
 await app.register(setupRoutes);
+await app.register(settingsRoutes);
+await app.register(tvScheduleRoutes);
 
 // ---- WebSocket endpoint ----
 

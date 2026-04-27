@@ -1,8 +1,14 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { createWsConnection, type WsConnection } from '$lib/ws.svelte.js';
   import { circuits as api, type Circuit, type Exercise } from '$lib/api';
+  import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
+
+  onMount(async () => {
+    await loadSettings();
+    applyBranding();
+  });
 
   // ════ Configuration ════
   let screenType    = $state<'station' | 'dashboard'>('station');
@@ -142,8 +148,14 @@
     <div class="w-full max-w-md px-8 space-y-8">
 
       <div class="text-center">
-        <div class="text-6xl mb-4">📺</div>
-        <h1 class="text-4xl font-black text-sky-400 tracking-tight">Circuit Fit TV</h1>
+        {#if studioSettings.logoUrl}
+          <img src={studioSettings.logoUrl} alt="Logo" class="h-16 w-auto object-contain mx-auto mb-3" />
+        {:else}
+          <div class="text-6xl mb-4">📺</div>
+        {/if}
+        <h1 class="text-4xl font-black tracking-tight" style="color: var(--color-primary, #0ea5e9);">
+          {studioSettings.studioName}
+        </h1>
         <p class="text-slate-400 mt-2">Configuration de l'écran station</p>
       </div>
 
@@ -240,8 +252,8 @@
 
       <button
         onclick={start}
-        class="w-full py-4 bg-sky-500 hover:bg-sky-400 active:bg-sky-600
-               text-white font-bold text-lg rounded-xl transition-colors"
+        class="w-full py-4 text-white font-bold text-lg rounded-xl transition-colors"
+        style="background: var(--color-primary, #0ea5e9);"
       >
         Démarrer l'affichage
       </button>
@@ -261,9 +273,13 @@
     <div class="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
       <button
         onclick={() => { conn?.destroy(); conn = null; }}
-        class="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity"
+        class="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity"
         title="Retour à la configuration"
       >
+        {#if studioSettings.logoUrl}
+          <img src={studioSettings.logoUrl} alt="Logo"
+               class="h-8 w-auto object-contain" style="filter: brightness(0) invert(1);" />
+        {/if}
         <span class="text-lg font-bold">{label}</span>
       </button>
 

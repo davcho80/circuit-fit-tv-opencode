@@ -20,6 +20,7 @@
 
   // ---- État du formulaire ----
   let name = $state(initial?.name ?? '');
+  let icon = $state(initial?.icon ?? '');
   let description = $state(initial?.description ?? '');
   let rounds = $state(initial?.rounds ?? 3);
   let workSec = $state(initial?.workSec ?? 40);
@@ -147,6 +148,7 @@
       await onsubmit({
         name: name.trim(),
         description: description.trim() || null,
+        icon: icon.trim() || null,
         rounds,
         workSec,
         restSec,
@@ -185,6 +187,29 @@
           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100
                  placeholder:text-slate-500 focus:outline-none focus:border-sky-500 text-sm"
         />
+      </div>
+
+      <!-- Icône (emoji) -->
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1" for="c-icon">
+          Icône <span class="text-slate-500 font-normal text-xs ml-1">affiché sur le calendrier TV</span>
+        </label>
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center
+                      justify-center text-2xl select-none">
+            {icon || '🏋️'}
+          </div>
+          <input
+            id="c-icon"
+            type="text"
+            bind:value={icon}
+            maxlength="2"
+            placeholder="🏋️"
+            class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-xl
+                   text-center focus:outline-none focus:border-sky-500"
+          />
+          <p class="text-xs text-slate-500">Coller un emoji (ex : 🔥 🏃 💪)</p>
+        </div>
       </div>
 
       <!-- Description -->

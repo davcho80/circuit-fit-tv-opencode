@@ -126,6 +126,7 @@ export const Circuit = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
   description: z.string().max(500).nullable(),
+  icon: z.string().max(10).nullable().optional(),
   rounds: z.number().int().min(1).max(10),
   workSec: z.number().int().min(5).max(600),
   restSec: z.number().int().min(0).max(300),
@@ -146,9 +147,12 @@ export type ScheduledBreak = z.infer<typeof ScheduledBreak>;
 
 export const CircuitCreate = Circuit.omit({
   id: true,
+  icon: true,
   stations: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  icon: z.string().max(10).nullable().optional(),
 }).extend({
   stations: z
     .array(

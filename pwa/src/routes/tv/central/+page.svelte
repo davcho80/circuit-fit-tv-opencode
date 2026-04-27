@@ -1,7 +1,13 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { createWsConnection } from '$lib/ws.svelte.js';
   import { circuits as api, type Circuit } from '$lib/api';
+  import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
+
+  onMount(async () => {
+    await loadSettings();
+    applyBranding();
+  });
 
   // ---- Setup ----
   let label = $state('TV Centrale');
@@ -141,8 +147,14 @@
   <div class="min-h-screen bg-slate-950 flex items-center justify-center">
     <div class="w-full max-w-sm px-8 space-y-8">
       <div class="text-center">
-        <div class="text-6xl mb-4">🖥️</div>
-        <h1 class="text-4xl font-black text-sky-400 tracking-tight">TV Centrale</h1>
+        {#if studioSettings.logoUrl}
+          <img src={studioSettings.logoUrl} alt="Logo" class="h-16 w-auto object-contain mx-auto mb-3" />
+        {:else}
+          <div class="text-6xl mb-4">🖥️</div>
+        {/if}
+        <h1 class="text-4xl font-black tracking-tight" style="color: var(--color-primary, #0ea5e9);">
+          {studioSettings.studioName}
+        </h1>
         <p class="text-slate-400 mt-2">Vue globale de toutes les stations</p>
       </div>
       <div class="space-y-2">
@@ -159,8 +171,8 @@
       </div>
       <button
         onclick={start}
-        class="w-full py-4 bg-sky-500 hover:bg-sky-400 active:bg-sky-600
-               text-white font-bold text-lg rounded-xl transition-colors"
+        class="w-full py-4 text-white font-bold text-lg rounded-xl transition-colors"
+        style="background: var(--color-primary, #0ea5e9);"
       >
         Démarrer l'affichage
       </button>
@@ -178,10 +190,15 @@
       <div class="px-5 pt-6 pb-4 border-b border-slate-800">
         <button
           onclick={() => { conn?.destroy(); conn = null; circuitData = null; }}
-          class="text-base font-bold text-sky-400 hover:text-sky-300 transition-colors leading-tight"
+          class="flex items-center gap-2 hover:opacity-80 transition-opacity"
           title="Déconnecter"
         >
-          Circuit Fit TV
+          {#if studioSettings.logoUrl}
+            <img src={studioSettings.logoUrl} alt="Logo" class="h-7 w-auto object-contain" />
+          {/if}
+          <span class="text-base font-bold leading-tight" style="color: var(--color-primary, #0ea5e9);">
+            {studioSettings.studioName}
+          </span>
         </button>
         {#if circuitData}
           <p class="text-sm text-slate-400 mt-0.5 truncate">{circuitData.name}</p>
@@ -462,8 +479,11 @@
 
       {:else}
         <!-- Attente côté carte -->
-        <div class="flex-1 flex items-center justify-center opacity-10">
-          <p class="text-4xl font-black tracking-[0.3em] text-white">CIRCUIT FIT TV</p>
+        <div class="flex-1 flex flex-col items-center justify-center gap-4 opacity-10">
+          {#if studioSettings.logoUrl}
+            <img src={studioSettings.logoUrl} alt="" class="h-16 w-auto object-contain" style="filter: brightness(0) invert(1);" />
+          {/if}
+          <p class="text-4xl font-black tracking-[0.3em] text-white">{studioSettings.studioName.toUpperCase()}</p>
         </div>
       {/if}
 
