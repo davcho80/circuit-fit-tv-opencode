@@ -18,7 +18,7 @@ if (!email || !password) {
 
 // Valider la politique de mot de passe
 const pwErrors: string[] = [];
-if (password.length < 12)        pwErrors.push('Minimum 12 caractères');
+if (password.length < 8)         pwErrors.push('Minimum 8 caractères');
 if (!/[A-Z]/.test(password))     pwErrors.push('Au moins une majuscule');
 if (!/[a-z]/.test(password))     pwErrors.push('Au moins une minuscule');
 if (!/[0-9]/.test(password))     pwErrors.push('Au moins un chiffre');

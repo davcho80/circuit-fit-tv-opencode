@@ -40,7 +40,7 @@
   // Validation mot de passe
   function pwValid(pw: string): boolean {
     return (
-      pw.length >= 12 &&
+      pw.length >= 8 &&
       /[A-Z]/.test(pw) &&
       /[a-z]/.test(pw) &&
       /[0-9]/.test(pw) &&
@@ -265,7 +265,7 @@
             placeholder="••••••••••••"
           />
           <p class="text-xs text-slate-500 mt-1.5">
-            Min. 12 car., majuscule, minuscule, chiffre, caractère spécial
+            Min. 8 car., majuscule, minuscule, chiffre, caractère spécial
           </p>
         </div>
 
@@ -317,7 +317,7 @@
             placeholder="••••••••••••"
           />
           <p class="text-xs text-slate-500 mt-1.5">
-            Min. 12 car., majuscule, minuscule, chiffre, caractère spécial
+            Min. 8 car., majuscule, minuscule, chiffre, caractère spécial
           </p>
         </div>
 

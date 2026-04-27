@@ -11,7 +11,7 @@
 
   // Validation locale de la politique de mot de passe
   const rules = $derived({
-    length:    newPassword.length >= 12,
+    length:    newPassword.length >= 8,
     upper:     /[A-Z]/.test(newPassword),
     lower:     /[a-z]/.test(newPassword),
     digit:     /[0-9]/.test(newPassword),
@@ -85,7 +85,7 @@
           {#if newPassword.length > 0}
             <ul class="mt-2 space-y-1 text-xs">
               <li class={rules.length  ? 'text-emerald-400' : 'text-slate-500'}>
-                {rules.length  ? '✓' : '○'} Minimum 12 caractères
+                {rules.length  ? '✓' : '○'} Minimum 8 caractères
               </li>
               <li class={rules.upper   ? 'text-emerald-400' : 'text-slate-500'}>
                 {rules.upper   ? '✓' : '○'} Au moins une majuscule

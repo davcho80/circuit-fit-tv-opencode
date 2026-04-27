@@ -9,7 +9,7 @@
   let loading         = $state(false);
 
   const rules = $derived({
-    length:  password.length >= 12,
+    length:  password.length >= 8,
     upper:   /[A-Z]/.test(password),
     lower:   /[a-z]/.test(password),
     digit:   /[0-9]/.test(password),
@@ -104,7 +104,7 @@
           />
           {#if password.length > 0}
             <ul class="mt-2 space-y-1 text-xs">
-              <li class={rules.length  ? 'text-emerald-400' : 'text-slate-500'}>{rules.length  ? '✓' : '○'} Minimum 12 caractères</li>
+              <li class={rules.length  ? 'text-emerald-400' : 'text-slate-500'}>{rules.length  ? '✓' : '○'} Minimum 8 caractères</li>
               <li class={rules.upper   ? 'text-emerald-400' : 'text-slate-500'}>{rules.upper   ? '✓' : '○'} Au moins une majuscule</li>
               <li class={rules.lower   ? 'text-emerald-400' : 'text-slate-500'}>{rules.lower   ? '✓' : '○'} Au moins une minuscule</li>
               <li class={rules.digit   ? 'text-emerald-400' : 'text-slate-500'}>{rules.digit   ? '✓' : '○'} Au moins un chiffre</li>

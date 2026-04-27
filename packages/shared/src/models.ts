@@ -41,7 +41,7 @@ export type UserRole = z.infer<typeof UserRole>;
 // Politique de mot de passe partagée frontend + backend
 export const PasswordPolicy = z
   .string()
-  .min(12, 'Minimum 12 caractères')
+  .min(8, 'Minimum 8 caractères')
   .regex(/[A-Z]/, 'Doit contenir une majuscule')
   .regex(/[a-z]/, 'Doit contenir une minuscule')
   .regex(/[0-9]/, 'Doit contenir un chiffre')
