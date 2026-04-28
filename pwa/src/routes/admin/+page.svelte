@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
+  import { page } from '$app/stores';
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/auth.svelte.js';
   import { t } from '$lib/i18n.svelte.js';
@@ -23,7 +24,12 @@
 
   // ── Tabs ──────────────────────────────────────────────────────────
   type Tab = 'studio' | 'screens' | 'tv' | 'users' | 'updates';
-  let activeTab = $state<Tab>('studio');
+  const validTabs: Tab[] = ['studio', 'screens', 'tv', 'users', 'updates'];
+
+  // Lire ?tab= et ?pin= depuis l'URL (QR code de la TV)
+  const urlTab = $page.url.searchParams.get('tab') as Tab | null;
+  const urlPin = $page.url.searchParams.get('pin') ?? '';
+  let activeTab = $state<Tab>(validTabs.includes(urlTab as Tab) ? (urlTab as Tab) : 'studio');
 
   const tabs = [
     { key: 'studio'  as Tab, icon: '🎨', label: () => t('admin.tab.studio')  },
@@ -53,6 +59,21 @@
     studioName   = studioSettings.studioName;
     primaryColor = studioSettings.primaryColor;
     timezone     = studioSettings.timezone;
+
+    // Si l'URL contient ?pin= (QR code de la TV) → aller sur Écrans et pré-ouvrir le modal
+    if (urlPin && /^\d{4}$/.test(urlPin)) {
+      activeTab = 'screens';
+      // Attendre le chargement des pairs en attente pour voir si la TV est déjà connue
+      await refreshPending();
+      const known = pendingPairs.find(p => p.pin === urlPin);
+      if (known) {
+        openPairModal(known);
+      } else {
+        // TV pas encore dans le registry (pas encore connectée) → pré-remplir PIN manuel
+        pin = urlPin;
+        openManualPairModal();
+      }
+    }
   });
 
   $effect(() => {
@@ -724,27 +745,25 @@
           </div>
         {/if}
 
-        <!-- Fallback : saisie PIN manuelle -->
-        <details class="group">
-          <summary class="text-sm text-slate-500 cursor-pointer hover:text-slate-300 transition-colors list-none flex items-center gap-2">
-            <span class="group-open:rotate-90 transition-transform inline-block">›</span>
-            {t('admin.screens.manualPin')}
-          </summary>
-          <div class="mt-3 space-y-3">
+        <!-- Fallback : saisie PIN manuelle (toujours visible) -->
+        <div class="border-t border-slate-800 pt-5 space-y-3">
+          <p class="text-sm font-medium text-slate-300">{t('admin.screens.manualPin')}</p>
+          <p class="text-xs text-slate-500">{t('admin.screens.manualPinDesc')}</p>
+          <div class="flex items-center gap-3">
             <input
               bind:value={pin}
               maxlength="4"
               inputmode="numeric"
               pattern="\d{4}"
               placeholder="0000"
-              class="w-full max-w-xs rounded-xl px-5 py-3 text-slate-100 text-3xl font-black text-center tracking-[0.4em]
+              class="w-36 rounded-xl px-4 py-3 text-slate-100 text-3xl font-black text-center tracking-[0.4em]
                      bg-slate-800 border border-slate-700 focus:border-sky-500 focus:outline-none transition-colors"
-              onkeydown={(e) => { if (e.key === 'Enter') openManualPairModal(); }}
+              onkeydown={(e) => { if (e.key === 'Enter' && pin.length === 4) openManualPairModal(); }}
             />
             <button
               onclick={openManualPairModal}
               disabled={pin.length !== 4}
-              class="px-5 py-2 rounded-lg font-semibold text-sm transition-all
+              class="px-5 py-2.5 rounded-lg font-semibold text-sm transition-all
                      {pin.length !== 4
                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                        : 'bg-sky-600 hover:bg-sky-500 text-white'}"
@@ -752,7 +771,7 @@
               {t('admin.screens.configureTv')}
             </button>
           </div>
-        </details>
+        </div>
 
         {#if pairStatus === 'success'}
           <div class="mt-4 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-center">

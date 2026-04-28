@@ -549,7 +549,7 @@ private fun PairingScreen(
                         }
                     }
                     Text(
-                        text = "Saisissez ce code dans Circuit Fit TV → Écrans",
+                        text = "Console admin → Admin → Écrans TV",
                         fontSize = 12.sp,
                         color = MUTED.copy(alpha = 0.6f),
                     )
