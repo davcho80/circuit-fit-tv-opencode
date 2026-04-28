@@ -67,7 +67,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 .replace(Regex("^ws://"),  "http://")
                 .replace(Regex("^wss://"), "https://")
                 .removeSuffix("/ws")
-            return "$httpBase/screens?pin=$pairingPin"
+            return "$httpBase/admin"
         }
     }
 
@@ -192,7 +192,8 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val s   = _ui.value
         // Sauvegarder au moins l'URL
         prefs.edit().putString("serverUrl", s.serverUrl).apply()
-        _ui.update { it.copy(isPairing = true, pairingPin = pin, screen = UiState.Screen.DISPLAY) }
+        // Rester sur SETUP pour que SetupScreen affiche le PairingScreen (QR + PIN)
+        _ui.update { it.copy(isPairing = true, pairingPin = pin) }
         createAndConnectPairing(s.serverUrl, pin)
     }
 
@@ -410,6 +411,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                     // Config reçue de la console → sauvegarder et démarrer l'affichage
                     val screenType = if (msg.screenType == "DASHBOARD") ScreenType.DASHBOARD else ScreenType.STATION
                     val newState = _ui.value.copy(
+                        screen        = UiState.Screen.DISPLAY,
                         isPairing     = false,
                         pairingPin    = "",
                         label         = msg.label,
