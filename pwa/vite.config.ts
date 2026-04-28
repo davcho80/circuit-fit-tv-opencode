@@ -36,6 +36,11 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    // Écoute sur toutes les interfaces pour que le téléphone/TV puisse accéder
+    // au dev server depuis le réseau local (nécessaire pour tester le flux QR).
+    host: true,
+  },
   // En dev, le client API utilise VITE_API_URL=http://localhost:3000 directement
   // (pas de proxy Vite pour éviter les conflits avec les routes SvelteKit)
 });

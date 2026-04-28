@@ -118,9 +118,10 @@ if (!config.isDev && existsSync(PWA_BUILD)) {
     return reply.sendFile('200.html', PWA_BUILD);
   });
 } else if (config.isDev) {
-  // En dev : redirige tout vers le dev server Vite (chemin + query string préservés)
+  // En dev : redirige tout vers le dev server Vite sur la même IP (chemin + query string préservés)
+  // Utilise req.hostname pour que les clients externes (téléphone, TV) puissent suivre la redirection.
   app.setNotFoundHandler((req, reply) => {
-    return reply.redirect(`http://localhost:5173${req.url}`);
+    return reply.redirect(`http://${req.hostname}:5173${req.url}`);
   });
 }
 
