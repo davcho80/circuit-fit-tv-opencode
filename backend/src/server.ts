@@ -69,19 +69,24 @@ await app.register(cors, {
 // JWT — doit être enregistré avant les routes protégées
 await app.register(jwtFastifyPlugin);
 
-// Hook d'auth global avec liste blanche
-// Routes exemptes : /health, /auth/*, /pair/*, /ws, assets statiques
-// Routes accessibles sans token (TV self-registration, WS, assets)
-const AUTH_EXEMPT_EXACT   = new Set(['/health', '/displays/online', '/displays']);
-const AUTH_EXEMPT_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/displays/', '/settings', '/tv-schedule', '/assets/', '/_app/', '/favicon'];
+// Hook d'auth global : n'applique l'auth QUE sur les routes API connues.
+// Les pages SPA (/admin, /circuits, /, etc.) et les assets sont laissés passer
+// pour que le navigateur puisse charger le frontend sans token.
+const PUBLIC_API_EXACT    = new Set(['/health', '/displays/online']);
+const PUBLIC_API_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/tv-schedule'];
+// Préfixes des routes API qui nécessitent une authentification
+const PROTECTED_PREFIXES  = [
+  '/exercises', '/circuits', '/displays', '/sessions',
+  '/schedules', '/stats', '/users', '/settings', '/update',
+];
 
 app.addHook('onRequest', async (req, reply) => {
-  const rawUrl: string = req.url ?? '';
-  const url = rawUrl.split('?')[0] ?? '';
-  if (AUTH_EXEMPT_EXACT.has(url))                          return;
-  if (AUTH_EXEMPT_PREFIXES.some((p) => url.startsWith(p))) return;
-  // En prod : laisser passer les assets statiques SPA
-  if (url === '/' || url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css')) return;
+  const url = (req.url ?? '').split('?')[0] ?? '';
+  // Pas une route API protégée → laisser passer (SPA page ou asset statique)
+  if (!PROTECTED_PREFIXES.some((p) => url.startsWith(p))) return;
+  // Routes API publiques explicites
+  if (PUBLIC_API_EXACT.has(url))                           return;
+  if (PUBLIC_API_PREFIXES.some((p) => url.startsWith(p))) return;
   await requireAuth(req, reply);
 });
 
