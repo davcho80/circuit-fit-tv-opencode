@@ -469,3 +469,66 @@ export const users = {
     return request('DELETE', `/users/${id}`);
   },
 };
+
+// ---- Types Update ----
+
+export interface UpdateStatus {
+  currentVersion:  string;
+  latestVersion:   string | null;
+  updateAvailable: boolean;
+  changelog:       string | null;
+  releaseUrl:      string | null;
+  publishedAt:     string | null;
+  canUpdate:       boolean;
+}
+
+// ---- Update ----
+
+export const update = {
+  status(): Promise<UpdateStatus> {
+    return request('GET', '/update/status');
+  },
+
+  start(): Promise<{ status: string }> {
+    return request('POST', '/update/start');
+  },
+
+  /** Consomme le flux SSE de logs et appelle onLine pour chaque ligne, onDone à la fin */
+  stream(onLine: (line: string) => void, onDone: () => void): () => void {
+    const base: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('cfitv_token') : null;
+
+    const ctrl = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch(`${base}/update/stream`, {
+          signal:  ctrl.signal,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok || !res.body) { onDone(); return; }
+
+        const reader = res.body.getReader();
+        const dec    = new TextDecoder();
+        let buf      = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() ?? '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try { onLine(JSON.parse(line.slice(6)) as string); } catch { /* skip */ }
+            }
+            if (line.startsWith('event: done')) { onDone(); return; }
+          }
+        }
+      } catch { /* aborted or network error */ }
+      onDone();
+    })();
+
+    return () => ctrl.abort();
+  },
+};

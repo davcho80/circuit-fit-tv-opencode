@@ -1,10 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/auth.svelte.js';
-  import { settings as settingsApi } from '$lib/api.js';
+  import { settings as settingsApi, update as updateApi, type UpdateStatus } from '$lib/api.js';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
   import { t } from '$lib/i18n.svelte.js';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
 
   if (!authStore.isAdmin) goto('/');
 
@@ -69,6 +69,76 @@
   $effect(() => {
     document.documentElement.style.setProperty('--color-primary-preview', primaryColor);
   });
+
+  // ---- Mise à jour ----
+
+  type UpdatePhase = 'idle' | 'checking' | 'up-to-date' | 'available' | 'streaming' | 'restarting' | 'done' | 'error';
+
+  let updatePhase   = $state<UpdatePhase>('idle');
+  let updateInfo    = $state<UpdateStatus | null>(null);
+  let updateLogs    = $state<string[]>([]);
+  let updateError   = $state('');
+  let restartSecs   = $state(0);
+
+  let stopStream: (() => void) | null = null;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+  onDestroy(() => {
+    stopStream?.();
+    if (pollInterval) clearInterval(pollInterval);
+  });
+
+  async function checkForUpdates() {
+    updatePhase = 'checking';
+    updateError = '';
+    try {
+      updateInfo  = await updateApi.status();
+      updatePhase = updateInfo.updateAvailable ? 'available' : 'up-to-date';
+    } catch (e) {
+      updateError = e instanceof Error ? e.message : 'Erreur de vérification';
+      updatePhase = 'error';
+    }
+  }
+
+  async function startUpdate() {
+    if (!updateInfo?.canUpdate) return;
+    updateLogs  = [];
+    updatePhase = 'streaming';
+
+    // Lancer le flux SSE de logs
+    stopStream = updateApi.stream(
+      (line) => { updateLogs = [...updateLogs, line]; },
+      () => {
+        // Le script est terminé → attendre que le serveur redémarre
+        stopStream = null;
+        beginRestartPolling();
+      },
+    );
+  }
+
+  function beginRestartPolling() {
+    updatePhase = 'restarting';
+    restartSecs = 0;
+    const API_BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+
+    // Compter les secondes affichées
+    const ticker = setInterval(() => { restartSecs++; }, 1000);
+
+    // Attendre que /health réponde avec la nouvelle version
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        if (res.ok) {
+          const data = await res.json() as { version: string };
+          clearInterval(ticker);
+          clearInterval(pollInterval!);
+          pollInterval = null;
+          updateInfo = { ...updateInfo!, currentVersion: data.version };
+          updatePhase = 'done';
+        }
+      } catch { /* serveur pas encore dispo */ }
+    }, 2000);
+  }
 </script>
 
 <svelte:head>
@@ -196,6 +266,130 @@
         </span>
       {/if}
     </div>
+  </div>
+
+  <!-- ════ Mises à jour ════ -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-base font-semibold text-slate-100">Mises à jour</h2>
+        <p class="text-slate-500 text-xs mt-0.5">Circuit Fit TV</p>
+      </div>
+
+      {#if updatePhase === 'idle' || updatePhase === 'up-to-date' || updatePhase === 'error'}
+        <button
+          onclick={checkForUpdates}
+          class="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg
+                 border border-slate-700 transition-colors"
+        >
+          Vérifier
+        </button>
+      {/if}
+    </div>
+
+    <!-- Version courante -->
+    {#if updateInfo}
+      <div class="flex items-center gap-3 text-sm">
+        <div class="bg-slate-800 rounded-lg px-3 py-2 flex-1">
+          <p class="text-xs text-slate-500 mb-0.5">Version actuelle</p>
+          <p class="font-mono font-semibold text-slate-100">{updateInfo.currentVersion}</p>
+        </div>
+        <div class="text-slate-600 text-lg">→</div>
+        <div class="rounded-lg px-3 py-2 flex-1
+          {updateInfo.updateAvailable
+            ? 'bg-emerald-900/40 border border-emerald-700/50'
+            : 'bg-slate-800'}">
+          <p class="text-xs text-slate-500 mb-0.5">Dernière version</p>
+          <p class="font-mono font-semibold {updateInfo.updateAvailable ? 'text-emerald-300' : 'text-slate-100'}">
+            {updateInfo.latestVersion ?? '—'}
+          </p>
+        </div>
+      </div>
+    {/if}
+
+    <!-- États -------- -->
+
+    {#if updatePhase === 'checking'}
+      <div class="flex items-center gap-2 text-slate-400 text-sm">
+        <span class="animate-spin">⟳</span> Vérification en cours…
+      </div>
+
+    {:else if updatePhase === 'up-to-date'}
+      <div class="flex items-center gap-2 text-emerald-400 text-sm">
+        <span>✓</span> Vous utilisez la dernière version.
+      </div>
+
+    {:else if updatePhase === 'available'}
+      <div class="space-y-3">
+        {#if updateInfo?.changelog}
+          <div class="bg-slate-800/60 rounded-lg p-3 text-xs text-slate-400 max-h-28 overflow-y-auto whitespace-pre-wrap border border-slate-700/50">
+            {updateInfo.changelog}
+          </div>
+        {/if}
+
+        {#if updateInfo?.canUpdate}
+          <button
+            onclick={startUpdate}
+            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold
+                   py-2.5 rounded-lg text-sm transition-colors"
+          >
+            Mettre à jour vers {updateInfo?.latestVersion}
+          </button>
+        {:else}
+          <div class="text-amber-400 text-xs bg-amber-900/20 border border-amber-700/30 rounded-lg px-3 py-2">
+            ⚠️ Mise à jour automatique non configurée. Exécutez <code class="font-mono bg-slate-800 px-1 rounded">update.sh</code> sur le serveur.
+          </div>
+          {#if updateInfo?.releaseUrl}
+            <a href={updateInfo.releaseUrl} target="_blank" rel="noopener"
+               class="text-xs text-sky-400 hover:text-sky-300 transition-colors">
+              Voir les notes de version →
+            </a>
+          {/if}
+        {/if}
+      </div>
+
+    {:else if updatePhase === 'streaming'}
+      <div class="space-y-2">
+        <p class="text-sm text-amber-300 flex items-center gap-2">
+          <span class="animate-pulse">●</span> Mise à jour en cours — ne pas fermer cette page
+        </p>
+        <div class="bg-slate-950 rounded-lg p-3 font-mono text-xs text-slate-300 max-h-48 overflow-y-auto space-y-0.5 border border-slate-800">
+          {#each updateLogs as line}
+            <div class="{line.startsWith('✅') ? 'text-emerald-400' : line.startsWith('❌') ? 'text-red-400' : 'text-slate-400'}">{line}</div>
+          {/each}
+          {#if updateLogs.length === 0}
+            <div class="text-slate-600 animate-pulse">En attente des logs…</div>
+          {/if}
+        </div>
+      </div>
+
+    {:else if updatePhase === 'restarting'}
+      <div class="space-y-3">
+        <div class="bg-slate-950 rounded-lg p-3 font-mono text-xs text-slate-300 max-h-48 overflow-y-auto space-y-0.5 border border-slate-800">
+          {#each updateLogs as line}
+            <div class="{line.startsWith('✅') ? 'text-emerald-400' : line.startsWith('❌') ? 'text-red-400' : 'text-slate-400'}">{line}</div>
+          {/each}
+        </div>
+        <div class="flex items-center gap-2 text-sky-400 text-sm">
+          <span class="animate-spin">⟳</span>
+          Redémarrage du serveur… ({restartSecs}s)
+        </div>
+      </div>
+
+    {:else if updatePhase === 'done'}
+      <div class="flex items-center gap-2 text-emerald-400 text-sm">
+        <span>✅</span>
+        Mise à jour vers <span class="font-mono font-semibold">{updateInfo?.currentVersion}</span> réussie !
+        <button onclick={() => window.location.reload()}
+                class="ml-auto text-xs text-sky-400 hover:text-sky-300 underline">
+          Recharger
+        </button>
+      </div>
+
+    {:else if updatePhase === 'error'}
+      <div class="text-red-400 text-sm">{updateError}</div>
+    {/if}
+
   </div>
 
   <!-- Prévisualisation TV -->

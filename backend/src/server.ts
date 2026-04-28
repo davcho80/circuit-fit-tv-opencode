@@ -43,6 +43,7 @@ import { usersRoutes } from './routes/users.js';
 import { setupRoutes } from './routes/setup.js';
 import { settingsRoutes } from './routes/settings.js';
 import { tvScheduleRoutes } from './routes/tv-schedule.js';
+import { updateRoutes }     from './routes/update.js';
 import { jwtFastifyPlugin, requireAuth } from './auth/jwt.plugin.js';
 import { bootstrapAdmin } from './auth/bootstrap.js';
 import { startScheduler } from './sessions/scheduler.js';
@@ -127,7 +128,7 @@ app.get('/health', async () => {
   return {
     status:  dbOk ? 'ok' : 'degraded',
     service: 'circuit-fit-tv-backend',
-    version: '0.1.0',
+    version: process.env['APP_VERSION'] ?? '0.1.0',
     time:    new Date().toISOString(),
     db:      dbOk ? 'ok' : 'error',
     ws: {
@@ -156,6 +157,7 @@ await app.register(usersRoutes);
 await app.register(setupRoutes);
 await app.register(settingsRoutes);
 await app.register(tvScheduleRoutes);
+await app.register(updateRoutes);
 
 // ---- WebSocket endpoint ----
 
