@@ -23,6 +23,14 @@
   type Tab = 'studio' | 'screens' | 'tv' | 'users' | 'updates';
   let activeTab = $state<Tab>('studio');
 
+  const tabs = [
+    { key: 'studio'  as Tab, icon: '🎨', label: () => t('admin.tab.studio')  },
+    { key: 'screens' as Tab, icon: '📺', label: () => t('admin.tab.screens') },
+    { key: 'tv'      as Tab, icon: '🖥️', label: () => t('admin.tab.tv')      },
+    { key: 'users'   as Tab, icon: '👥', label: () => t('admin.tab.users')   },
+    { key: 'updates' as Tab, icon: '🔄', label: () => t('admin.tab.updates') },
+  ];
+
   // ═══════════════════════════════════════════════════════════════════
   // TAB: STUDIO
   // ═══════════════════════════════════════════════════════════════════
@@ -396,22 +404,16 @@
 
   <!-- Tab bar -->
   <div class="flex gap-1 border-b border-slate-800 overflow-x-auto">
-    {#each ([
-      { key: 'studio',  icon: '🎨', label: t('admin.tab.studio')  },
-      { key: 'screens', icon: '📺', label: t('admin.tab.screens') },
-      { key: 'tv',      icon: '🖥️', label: t('admin.tab.tv')      },
-      { key: 'users',   icon: '👥', label: t('admin.tab.users')   },
-      { key: 'updates', icon: '🔄', label: t('admin.tab.updates') },
-    ] as const)}
+    {#each tabs as tab}
       <button
-        onclick={() => { activeTab = key; }}
+        onclick={() => { activeTab = tab.key; }}
         class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors shrink-0 border-b-2
-          {activeTab === key
+          {activeTab === tab.key
             ? 'border-sky-500 text-sky-300'
             : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'}"
       >
-        <span>{icon}</span>
-        <span>{label}</span>
+        <span>{tab.icon}</span>
+        <span>{tab.label()}</span>
       </button>
     {/each}
   </div>
