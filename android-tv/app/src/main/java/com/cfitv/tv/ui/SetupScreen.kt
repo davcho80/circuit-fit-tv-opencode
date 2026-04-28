@@ -459,11 +459,13 @@ private fun PairingScreen(
     onCancel: () -> Unit,
 ) {
     // Générer le QR code sur un thread de fond (512×512 setPixel bloque le main thread)
-    val qrBitmap: ImageBitmap? by produceState<ImageBitmap?>(null, pairingUrl) {
+    val qrBitmapState: ImageBitmap? by produceState<ImageBitmap?>(null, pairingUrl) {
         value = withContext(Dispatchers.Default) {
             if (pairingUrl.isNotEmpty()) generateQrImageBitmap(pairingUrl, 512) else null
         }
     }
+    // Capture locale pour permettre le smart cast (propriété déléguée non castable directement)
+    val qrBitmap = qrBitmapState
 
     Box(
         modifier = Modifier.fillMaxSize().background(BG),
