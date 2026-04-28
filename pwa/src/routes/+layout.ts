@@ -9,7 +9,7 @@ import { authStore } from '$lib/auth.svelte.js';
 import type { LayoutLoad } from './$types';
 
 // Routes accessibles sans authentification
-const PUBLIC_PREFIXES = ['/login', '/change-password', '/setup', '/tv'];
+const PUBLIC_PREFIXES = ['/login', '/change-password', '/setup', '/tv', '/pair'];
 
 const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
 

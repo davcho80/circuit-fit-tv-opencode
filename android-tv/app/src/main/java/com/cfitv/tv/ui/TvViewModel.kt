@@ -67,7 +67,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 .replace(Regex("^ws://"),  "http://")
                 .replace(Regex("^wss://"), "https://")
                 .removeSuffix("/ws")
-            return "$httpBase/admin?tab=screens&pin=$pairingPin"
+            return "$httpBase/pair?pin=$pairingPin"
         }
     }
 
