@@ -41,7 +41,8 @@ export const load: LayoutLoad = async ({ url, fetch }) => {
   }
 
   if (!authStore.token && !isPublic) {
-    throw redirect(302, '/login');
+    const dest = url.pathname + (url.search ? url.search : '');
+    throw redirect(302, `/login?redirect=${encodeURIComponent(dest)}`);
   }
 
   if (authStore.mustChangePassword && pathname !== '/change-password') {

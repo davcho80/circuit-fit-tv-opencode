@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { authStore } from '$lib/auth.svelte.js';
 
   let email    = $state('');
@@ -16,7 +17,8 @@
       if (authStore.mustChangePassword) {
         goto('/change-password');
       } else {
-        goto('/');
+        const redirect = $page.url.searchParams.get('redirect');
+        goto(redirect ?? '/');
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Erreur de connexion';
