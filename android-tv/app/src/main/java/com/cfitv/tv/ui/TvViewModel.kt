@@ -3,6 +3,7 @@ package com.cfitv.tv.ui
 import android.app.Application
 import android.content.Context
 import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
