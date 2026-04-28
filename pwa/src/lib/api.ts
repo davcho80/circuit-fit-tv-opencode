@@ -293,6 +293,35 @@ export interface DisplayPatch {
   stationNumber?: number | null;
 }
 
+// ---- Types Pair ----
+
+export interface PendingPair {
+  pin:          string;
+  clientId:     string;
+  deviceModel?: string;
+  deviceOs?:    string;
+  appVersion?:  string;
+  waitingSec:   number;
+}
+
+// ---- Pair ----
+
+export const pair = {
+  pending(fetchFn?: typeof globalThis.fetch): Promise<PendingPair[]> {
+    return request('GET', '/pair/pending', undefined, fetchFn);
+  },
+
+  claim(data: {
+    pin:           string;
+    label:         string;
+    stationNumber: number;
+    screenType:    'STATION' | 'DASHBOARD';
+    isLandscape:   boolean;
+  }): Promise<{ ok: boolean; clientId: string; label: string }> {
+    return request('POST', '/pair/claim', data);
+  },
+};
+
 // ---- Displays ----
 
 export const displays = {

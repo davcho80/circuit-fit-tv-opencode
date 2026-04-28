@@ -115,8 +115,10 @@ data class PhaseInfo(
 data class PairConfig(
     val label: String,
     val stationNumber: Int,
-    val screenType: String,   // "STATION" | "DASHBOARD"
+    val screenType: String,       // "STATION" | "DASHBOARD"
     val isLandscape: Boolean,
+    val primaryColor: String? = null,
+    val logoUrl: String? = null,
 ) : ServerMessage()
 
 // ---- Client → Serveur ----
@@ -138,5 +140,10 @@ sealed class ClientMessage {
     data class Heartbeat(val t: Long) : ClientMessage()
 
     @Serializable @SerialName("PAIR_REGISTER")
-    data class PairRegister(val pin: String) : ClientMessage()
+    data class PairRegister(
+        val pin: String,
+        val deviceModel: String? = null,
+        val deviceOs: String? = null,
+        val appVersion: String? = null,
+    ) : ClientMessage()
 }

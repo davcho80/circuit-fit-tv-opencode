@@ -107,7 +107,11 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
       break;
 
     case 'PAIR_REGISTER':
-      registerPin(msg.pin, client);
+      registerPin(msg.pin, client, {
+        deviceModel: msg.deviceModel,
+        deviceOs:    msg.deviceOs,
+        appVersion:  msg.appVersion,
+      });
       break;
   }
 }

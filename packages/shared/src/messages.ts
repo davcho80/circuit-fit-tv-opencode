@@ -69,8 +69,11 @@ export const DriftReportMsg = z.object({
 
 // TV → Serveur : enregistre un code PIN d'appairage
 export const PairRegisterMsg = z.object({
-  type: z.literal('PAIR_REGISTER'),
-  pin: z.string().length(4),
+  type:        z.literal('PAIR_REGISTER'),
+  pin:         z.string().length(4),
+  deviceModel: z.string().optional(),
+  deviceOs:    z.string().optional(),
+  appVersion:  z.string().optional(),
 });
 
 export const ClientMessage = z.discriminatedUnion('type', [
@@ -209,11 +212,13 @@ export const ErrorMsg = z.object({
 
 // Serveur → TV : config poussée après validation du PIN par l'admin
 export const PairConfigMsg = z.object({
-  type: z.literal('PAIR_CONFIG'),
-  label: z.string().min(1).max(50),
+  type:         z.literal('PAIR_CONFIG'),
+  label:        z.string().min(1).max(50),
   stationNumber: z.number().int().min(1).max(20),
-  screenType: z.enum(['STATION', 'DASHBOARD']),
-  isLandscape: z.boolean(),
+  screenType:   z.enum(['STATION', 'DASHBOARD']),
+  isLandscape:  z.boolean(),
+  primaryColor: z.string().optional(),   // couleur principale du studio
+  logoUrl:      z.string().nullable().optional(),  // URL du logo studio
 });
 
 export const ServerMessage = z.discriminatedUnion('type', [

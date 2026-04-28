@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cfitv.tv.ws.*
@@ -47,6 +48,8 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val stationNumber: Int        = 1,
         val isLandscape: Boolean      = true,
         val connected: Boolean        = false,
+        val primaryColor: String      = "#0ea5e9",
+        val logoUrl: String?          = null,
         val session: SessionPayload?  = null,
         val circuit: CircuitResponse? = null,
         val isMyWork: Boolean         = false,
@@ -83,14 +86,18 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val savedUrl = url ?: "ws://192.168.1.1:3000/ws"
 
         if (url != null && label != null && station > 0 && type != null) {
-            val screenType = try { ScreenType.valueOf(type) } catch (_: Exception) { ScreenType.STATION }
+            val screenType   = try { ScreenType.valueOf(type) } catch (_: Exception) { ScreenType.STATION }
+            val primaryColor = prefs.getString("primaryColor", "#0ea5e9") ?: "#0ea5e9"
+            val logoUrl      = prefs.getString("logoUrl", null)
             return UiState(
-                screen       = UiState.Screen.DISPLAY,
-                screenType   = screenType,
-                serverUrl    = url,
-                label        = label,
+                screen        = UiState.Screen.DISPLAY,
+                screenType    = screenType,
+                serverUrl     = url,
+                label         = label,
                 stationNumber = station,
-                isLandscape  = land,
+                isLandscape   = land,
+                primaryColor  = primaryColor,
+                logoUrl       = logoUrl,
             )
         }
         return UiState(serverUrl = savedUrl)
@@ -103,6 +110,8 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
             .putInt("stationNumber", s.stationNumber)
             .putBoolean("isLandscape", s.isLandscape)
             .putString("screenType", s.screenType.name)
+            .putString("primaryColor", s.primaryColor)
+            .putString("logoUrl", s.logoUrl)
             .apply()
     }
 
@@ -132,6 +141,37 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     private var nsdDiscoveryListener: NsdManager.DiscoveryListener? = null
     private val discoveryActive = AtomicBoolean(false)
     private val resolveInProgress = AtomicBoolean(false)
+
+    // Enregistrement mDNS de la TV (émission)
+    private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
+
+    private fun startMdnsRegistration(pin: String) {
+        stopMdnsRegistration()
+        val serviceInfo = NsdServiceInfo().apply {
+            serviceName = "cfitv-tv"
+            serviceType = "_cfitv-tv._tcp."
+            port        = 5353   // port symbolique (la TV n'écoute pas, c'est pour la découverte)
+            setAttribute("pin",   pin)
+            setAttribute("model", Build.MODEL)
+            setAttribute("os",    "Android ${Build.VERSION.RELEASE}")
+        }
+        nsdRegistrationListener = object : NsdManager.RegistrationListener {
+            override fun onRegistrationFailed(i: NsdServiceInfo, e: Int) {}
+            override fun onUnregistrationFailed(i: NsdServiceInfo, e: Int) {}
+            override fun onServiceRegistered(i: NsdServiceInfo) {}
+            override fun onServiceUnregistered(i: NsdServiceInfo) {}
+        }
+        try {
+            nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, nsdRegistrationListener!!)
+        } catch (_: Exception) { nsdRegistrationListener = null }
+    }
+
+    private fun stopMdnsRegistration() {
+        nsdRegistrationListener?.let {
+            try { nsdManager.unregisterService(it) } catch (_: Exception) {}
+        }
+        nsdRegistrationListener = null
+    }
 
     // ---- Internes ----
 
@@ -184,11 +224,13 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         // Sauvegarder au moins l'URL
         prefs.edit().putString("serverUrl", s.serverUrl).apply()
         _ui.update { it.copy(isPairing = true, pairingPin = pin, screen = UiState.Screen.DISPLAY) }
+        startMdnsRegistration(pin)
         createAndConnectPairing(s.serverUrl, pin)
     }
 
     /** Annuler le mode appairage → retour à l'écran de setup */
     fun cancelPairing() {
+        stopMdnsRegistration()
         wsClient?.close()
         wsClient = null
         reconnectJob?.cancel()
@@ -311,13 +353,25 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun createAndConnectPairing(serverUrl: String, pin: String) {
+        val deviceModel = Build.MODEL
+        val deviceOs    = "Android ${Build.VERSION.RELEASE}"
+        val appVersion  = try {
+            getApplication<Application>().packageManager
+                .getPackageInfo(getApplication<Application>().packageName, 0).versionName ?: ""
+        } catch (_: Exception) { "" }
+
         wsClient?.close()
         wsClient = WsClient(
             serverUrl      = serverUrl,
             label          = "Appairage",
             onConnected    = {
                 viewModelScope.launch { _ui.update { it.copy(connected = true) } }
-                wsClient?.sendPairRegister(pin)
+                wsClient?.sendPairRegister(
+                    pin         = pin,
+                    deviceModel = deviceModel,
+                    deviceOs    = deviceOs,
+                    appVersion  = appVersion,
+                )
             },
             onMessage      = { msg -> handleMessage(msg) },
             onDisconnected = {
@@ -387,6 +441,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 is PairConfig -> {
                     // Config reçue de la console → sauvegarder et démarrer l'affichage
+                    stopMdnsRegistration()
                     val screenType = if (msg.screenType == "DASHBOARD") ScreenType.DASHBOARD else ScreenType.STATION
                     val newState = _ui.value.copy(
                         isPairing     = false,
@@ -395,6 +450,8 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                         stationNumber = msg.stationNumber,
                         isLandscape   = msg.isLandscape,
                         screenType    = screenType,
+                        primaryColor  = msg.primaryColor ?: _ui.value.primaryColor,
+                        logoUrl       = msg.logoUrl,
                     )
                     saveConfig(newState)
                     _ui.update { newState }
@@ -503,6 +560,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         super.onCleared()
         stopMdnsDiscovery()
+        stopMdnsRegistration()
         wsClient?.close()
         reconnectJob?.cancel()
         heartbeatJob?.cancel()

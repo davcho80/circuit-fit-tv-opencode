@@ -69,8 +69,13 @@ class WsClient(
         send(ClientMessage.Heartbeat(t = t))
     }
 
-    fun sendPairRegister(pin: String) {
-        send(ClientMessage.PairRegister(pin = pin))
+    fun sendPairRegister(pin: String, deviceModel: String? = null, deviceOs: String? = null, appVersion: String? = null) {
+        send(ClientMessage.PairRegister(
+            pin         = pin,
+            deviceModel = deviceModel,
+            deviceOs    = deviceOs,
+            appVersion  = appVersion,
+        ))
     }
 
     private fun send(msg: ClientMessage) {

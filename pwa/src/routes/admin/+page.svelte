@@ -5,14 +5,16 @@
   import { t } from '$lib/i18n.svelte.js';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
   import {
-    settings as settingsApi,
-    update  as updateApi,
-    displays as displaysApi,
-    users   as usersApi,
+    settings  as settingsApi,
+    update    as updateApi,
+    displays  as displaysApi,
+    users     as usersApi,
+    pair      as pairApi,
     type UpdateStatus,
     type Display,
     type DisplayRole,
     type UserPublic,
+    type PendingPair,
   } from '$lib/api.js';
 
   if (!authStore.isAdmin) goto('/');
@@ -105,25 +107,60 @@
   let displays    = $state<Display[]>(data.displays);
   let onlineIds   = $state<Set<string>>(data.onlineIds);
 
-  // Pairing form
-  let pin           = $state('');
-  let screenType    = $state<'STATION' | 'CENTRAL'>('STATION');
+  // TVs découvertes automatiquement (en mode appairage)
+  let pendingPairs   = $state<PendingPair[]>([]);
+  let pendingLoading = $state(false);
+
+  async function refreshPending() {
+    pendingLoading = true;
+    try { pendingPairs = await pairApi.pending(); }
+    catch { pendingPairs = []; }
+    finally { pendingLoading = false; }
+  }
+
+  // Modal appairage (déclenché par clic sur une TV découverte ou manuellement)
+  let pairModal     = $state<{ pin: string; deviceModel?: string; deviceOs?: string } | null>(null);
+  let screenType    = $state<'STATION' | 'DASHBOARD'>('STATION');
   let label         = $state('Station 1');
   let stationNumber = $state(1);
   let isLandscape   = $state(true);
   let pairStatus    = $state<'idle' | 'loading' | 'success' | 'error'>('idle');
   let pairError     = $state('');
 
+  // Formulaire PIN manuel (fallback)
+  let pin = $state('');
+
   $effect(() => {
-    if (screenType === 'CENTRAL') label = 'Central';
+    if (screenType === 'DASHBOARD') label = 'Central';
     else if (label === 'Central') label = `Station ${stationNumber}`;
   });
   $effect(() => {
     if (screenType === 'STATION') label = `Station ${stationNumber}`;
   });
 
+  function openPairModal(p: PendingPair) {
+    pairModal     = { pin: p.pin, deviceModel: p.deviceModel, deviceOs: p.deviceOs };
+    screenType    = 'STATION';
+    label         = 'Station 1';
+    stationNumber = 1;
+    isLandscape   = true;
+    pairStatus    = 'idle';
+    pairError     = '';
+  }
+
+  function openManualPairModal() {
+    pairModal     = { pin: '' };
+    screenType    = 'STATION';
+    label         = 'Station 1';
+    stationNumber = 1;
+    isLandscape   = true;
+    pairStatus    = 'idle';
+    pairError     = '';
+  }
+
   async function claim() {
-    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    const effectivePin = pairModal?.pin || pin;
+    if (effectivePin.length !== 4 || !/^\d{4}$/.test(effectivePin)) {
       pairError = t('admin.screens.pinError');
       pairStatus = 'error';
       return;
@@ -131,23 +168,21 @@
     pairStatus = 'loading';
     pairError  = '';
     try {
-      const res = await fetch('/pair/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, label, stationNumber, screenType, isLandscape }),
+      await pairApi.claim({
+        pin:           effectivePin,
+        label,
+        stationNumber,
+        screenType,
+        isLandscape,
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        pairError  = (d as { error?: string }).error ?? `Erreur ${res.status}`;
-        pairStatus = 'error';
-        return;
-      }
       pairStatus = 'success';
+      pairModal  = null;
       pin = '';
       await refreshScreens();
+      await refreshPending();
       setTimeout(() => { pairStatus = 'idle'; }, 4000);
-    } catch {
-      pairError  = t('admin.screens.serverError');
+    } catch (e) {
+      pairError  = e instanceof Error ? e.message : t('admin.screens.serverError');
       pairStatus = 'error';
     }
   }
@@ -164,7 +199,10 @@
     onlineIds = new Set<string>(or.onlineIds);
   }
 
-  const screenRefreshTimer = setInterval(() => void refreshScreens(), 20_000);
+  const screenRefreshTimer  = setInterval(() => void refreshScreens(), 20_000);
+  const pendingRefreshTimer = setInterval(() => void refreshPending(), 5_000);
+  // Chargement initial
+  void refreshPending();
 
   // Edit display
   let editDisplay  = $state<Display | null>(null);
@@ -387,6 +425,7 @@
 
   onDestroy(() => {
     clearInterval(screenRefreshTimer);
+    clearInterval(pendingRefreshTimer);
     stopStream?.();
     if (pollInterval) clearInterval(pollInterval);
   });
@@ -641,123 +680,85 @@
 
       <hr class="border-slate-800" />
 
-      <!-- Formulaire appairage -->
+      <!-- TVs détectées automatiquement -->
       <section>
-        <h2 class="text-lg font-bold text-slate-100 mb-1">{t('admin.screens.pairTitle')}</h2>
-        <p class="text-slate-400 mb-4 text-sm">{t('admin.screens.pairDesc')}</p>
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-slate-100">{t('admin.screens.pairTitle')}</h2>
+            <p class="text-slate-400 text-sm mt-0.5">{t('admin.screens.pairDesc')}</p>
+          </div>
+          <button
+            onclick={() => void refreshPending()}
+            class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 px-3 py-1.5 rounded-lg transition-colors"
+            title="Actualiser"
+          >⟳</button>
+        </div>
 
-        <div class="space-y-5 max-w-lg">
+        {#if pendingPairs.length > 0}
+          <div class="space-y-2 mb-6">
+            {#each pendingPairs as p (p.clientId)}
+              <button
+                onclick={() => openPairModal(p)}
+                class="w-full flex items-center gap-4 bg-emerald-900/20 border border-emerald-700/50
+                       hover:border-emerald-500/60 hover:bg-emerald-900/30 rounded-xl px-4 py-3 transition-all text-left"
+              >
+                <span class="text-2xl">📺</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="font-semibold text-emerald-300">{t('admin.screens.waitingPair')}</span>
+                    <span class="font-mono text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded">PIN {p.pin}</span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    {p.deviceModel ?? 'TV'}{p.deviceOs ? ` · ${p.deviceOs}` : ''}
+                    {#if p.waitingSec < 60}· {p.waitingSec}s{:else}· {Math.floor(p.waitingSec / 60)} min{/if}
+                  </p>
+                </div>
+                <span class="text-emerald-400 text-sm font-medium shrink-0">{t('admin.screens.pairBtn')} →</span>
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <div class="text-slate-600 text-sm py-6 text-center border border-dashed border-slate-800 rounded-xl mb-6">
+            {pendingLoading ? t('admin.screens.scanning') : t('admin.screens.noTvFound')}
+          </div>
+        {/if}
 
-          <div class="space-y-1.5">
-            <label for="pin" class="block text-sm font-medium text-slate-300">{t('admin.screens.pinLabel')}</label>
+        <!-- Fallback : saisie PIN manuelle -->
+        <details class="group">
+          <summary class="text-sm text-slate-500 cursor-pointer hover:text-slate-300 transition-colors list-none flex items-center gap-2">
+            <span class="group-open:rotate-90 transition-transform inline-block">›</span>
+            {t('admin.screens.manualPin')}
+          </summary>
+          <div class="mt-3 space-y-3">
             <input
-              id="pin"
               bind:value={pin}
               maxlength="4"
               inputmode="numeric"
               pattern="\d{4}"
               placeholder="0000"
-              class="w-full rounded-xl px-5 py-4 text-slate-100 text-4xl font-black text-center tracking-[0.4em]
+              class="w-full max-w-xs rounded-xl px-5 py-3 text-slate-100 text-3xl font-black text-center tracking-[0.4em]
                      bg-slate-800 border border-slate-700 focus:border-sky-500 focus:outline-none transition-colors"
-              onkeydown={(e) => { if (e.key === 'Enter') void claim(); }}
+              onkeydown={(e) => { if (e.key === 'Enter') openManualPairModal(); }}
             />
-          </div>
-
-          <div class="space-y-1.5">
-            <p class="text-sm font-medium text-slate-300">{t('admin.screens.typeLabel')}</p>
-            <div class="grid grid-cols-2 gap-3">
-              {#each [
-                { value: 'STATION', icon: '🏋️', label: 'Station', desc: t('admin.screens.stationDesc') },
-                { value: 'CENTRAL', icon: '📊', label: 'Central', desc: t('admin.screens.centralDesc') },
-              ] as opt}
-                <button
-                  onclick={() => { screenType = opt.value as 'STATION' | 'CENTRAL'; }}
-                  class="flex flex-col items-center gap-1.5 px-4 py-4 rounded-xl border-2 transition-all
-                         {screenType === opt.value
-                           ? 'border-sky-500 bg-sky-500/10 text-sky-300'
-                           : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'}"
-                >
-                  <span class="text-2xl">{opt.icon}</span>
-                  <span class="font-semibold text-sm">{opt.label}</span>
-                  <span class="text-xs opacity-70">{opt.desc}</span>
-                </button>
-              {/each}
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <div class="space-y-1.5">
-              <label for="screen-label" class="block text-sm font-medium text-slate-300">{t('admin.screens.nameLabel')}</label>
-              <input
-                id="screen-label"
-                bind:value={label}
-                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3
-                       text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
-              />
-            </div>
-
-            {#if screenType === 'STATION'}
-              <div class="space-y-1.5">
-                <p class="block text-sm font-medium text-slate-300">{t('admin.screens.stationNum')}</p>
-                <div class="flex items-center gap-3">
-                  <button
-                    onclick={() => { if (stationNumber > 1) stationNumber--; }}
-                    class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xl font-bold hover:bg-slate-700 transition-colors"
-                  >−</button>
-                  <span class="w-12 text-center text-2xl font-black text-sky-400">{stationNumber}</span>
-                  <button
-                    onclick={() => { if (stationNumber < 20) stationNumber++; }}
-                    class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xl font-bold hover:bg-slate-700 transition-colors"
-                  >+</button>
-                </div>
-              </div>
-
-              <div class="space-y-1.5">
-                <p class="text-sm font-medium text-slate-300">{t('admin.screens.orientation')}</p>
-                <div class="grid grid-cols-2 gap-3">
-                  {#each [
-                    { value: true,  icon: '▬', label: t('admin.screens.landscape'), desc: t('admin.screens.landscapeDesc') },
-                    { value: false, icon: '▮', label: t('admin.screens.portrait'),  desc: t('admin.screens.portraitDesc')  },
-                  ] as opt}
-                    <button
-                      onclick={() => { isLandscape = opt.value; }}
-                      class="flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl border-2 transition-all
-                             {isLandscape === opt.value
-                               ? 'border-sky-500 bg-sky-500/10 text-sky-300'
-                               : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'}"
-                    >
-                      <span class="text-xl">{opt.icon}</span>
-                      <span class="font-semibold text-sm">{opt.label}</span>
-                      <span class="text-xs opacity-70">{opt.desc}</span>
-                    </button>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          </div>
-
-          {#if pairStatus === 'success'}
-            <div class="py-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40
-                        text-emerald-300 font-bold text-center text-lg">
-              {t('admin.screens.success')}
-            </div>
-          {:else}
             <button
-              onclick={claim}
-              disabled={pairStatus === 'loading' || pin.length !== 4}
-              class="w-full py-4 rounded-xl font-bold text-lg transition-all
-                     {pairStatus === 'loading' || pin.length !== 4
+              onclick={openManualPairModal}
+              disabled={pin.length !== 4}
+              class="px-5 py-2 rounded-lg font-semibold text-sm transition-all
+                     {pin.length !== 4
                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                       : 'bg-sky-500 hover:bg-sky-400 text-white'}"
+                       : 'bg-sky-600 hover:bg-sky-500 text-white'}"
             >
-              {pairStatus === 'loading' ? t('admin.screens.pairing') : t('admin.screens.pairBtn')}
+              {t('admin.screens.configureTv')}
             </button>
-          {/if}
+          </div>
+        </details>
 
-          {#if pairStatus === 'error'}
-            <p class="text-red-400 text-sm text-center">{pairError}</p>
-          {/if}
-        </div>
+        {#if pairStatus === 'success'}
+          <div class="mt-4 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-center">
+            {t('admin.screens.success')}
+          </div>
+        {/if}
       </section>
     </div>
   {/if}
@@ -1012,6 +1013,139 @@
   {/if}
 
 </div>
+
+<!-- ══ Modal appairage TV ══ -->
+{#if pairModal !== null}
+  <div
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    role="presentation"
+    onclick={(e) => { if (e.target === e.currentTarget) pairModal = null; }}
+  >
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl"
+         role="dialog" aria-modal="true">
+      <div class="px-6 pt-6 pb-4 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-100">{t('admin.screens.modalTitle')}</h2>
+          {#if pairModal.deviceModel || pairModal.deviceOs}
+            <p class="text-xs text-slate-500 mt-0.5">
+              {pairModal.deviceModel ?? ''}{pairModal.deviceOs ? ` · ${pairModal.deviceOs}` : ''}
+            </p>
+          {/if}
+        </div>
+        <button onclick={() => { pairModal = null; }} class="text-slate-400 hover:text-slate-100 text-xl leading-none">×</button>
+      </div>
+
+      <div class="px-6 py-5 space-y-5">
+
+        <!-- Type d'écran -->
+        <div>
+          <p class="text-sm font-medium text-slate-300 mb-2">{t('admin.screens.typeLabel')}</p>
+          <div class="grid grid-cols-2 gap-2">
+            {#each [
+              { value: 'STATION',   icon: '🏋️', label: 'Station',   desc: t('admin.screens.stationDesc')   },
+              { value: 'DASHBOARD', icon: '📊', label: 'Dashboard', desc: t('admin.screens.dashboardDesc') },
+            ] as opt}
+              <button type="button" onclick={() => { screenType = opt.value as 'STATION' | 'DASHBOARD'; }}
+                class="flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-medium transition-all
+                  {screenType === opt.value
+                    ? 'border-sky-500 bg-sky-500/10 text-sky-300'
+                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'}">
+                <span class="text-xl">{opt.icon}</span>
+                <span class="font-semibold">{opt.label}</span>
+                <span class="text-slate-500 font-normal">{opt.desc}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Nom de l'écran -->
+        <div>
+          <label for="pair-label" class="block text-sm font-medium text-slate-300 mb-1.5">{t('admin.screens.nameLabel')}</label>
+          <input
+            id="pair-label"
+            bind:value={label}
+            maxlength="50"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-sky-600"
+            placeholder="Station 1"
+          />
+        </div>
+
+        <!-- Numéro de station (si STATION) -->
+        {#if screenType === 'STATION'}
+          <div>
+            <p class="text-sm font-medium text-slate-300 mb-2">{t('admin.screens.stationNum')}</p>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick={() => { if (stationNumber > 1) stationNumber--; }}
+                class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-lg font-bold hover:bg-slate-700 transition-colors">−</button>
+              <span class="w-10 text-center text-xl font-black text-sky-400">{stationNumber}</span>
+              <button type="button" onclick={() => { if (stationNumber < 20) stationNumber++; }}
+                class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-lg font-bold hover:bg-slate-700 transition-colors">+</button>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Orientation -->
+        <div>
+          <p class="text-sm font-medium text-slate-300 mb-2">{t('admin.screens.orientation')}</p>
+          <div class="grid grid-cols-2 gap-2">
+            {#each [
+              { value: true,  icon: '🖥️', label: t('admin.screens.landscape'), desc: t('admin.screens.landscapeDesc') },
+              { value: false, icon: '📱', label: t('admin.screens.portrait'),  desc: t('admin.screens.portraitDesc')  },
+            ] as opt}
+              <button type="button" onclick={() => { isLandscape = opt.value; }}
+                class="flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-medium transition-all
+                  {isLandscape === opt.value
+                    ? 'border-sky-500 bg-sky-500/10 text-sky-300'
+                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'}">
+                <span class="text-xl">{opt.icon}</span>
+                <span class="font-semibold">{opt.label}</span>
+                <span class="text-slate-500 font-normal">{opt.desc}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <!-- PIN manuel (si ouvert via formulaire manuel) -->
+        {#if pairModal.pin === ''}
+          <div>
+            <label for="modal-pin" class="block text-sm font-medium text-slate-300 mb-1.5">{t('admin.screens.pinLabel')}</label>
+            <input
+              id="modal-pin"
+              bind:value={pin}
+              maxlength="4"
+              inputmode="numeric"
+              pattern="\d{4}"
+              placeholder="0000"
+              class="w-full rounded-xl px-5 py-3 text-slate-100 text-3xl font-black text-center tracking-[0.4em]
+                     bg-slate-800 border border-slate-700 focus:border-sky-500 focus:outline-none transition-colors"
+            />
+          </div>
+        {/if}
+
+        {#if pairStatus === 'error' && pairError}
+          <div class="text-red-400 text-sm bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">{pairError}</div>
+        {/if}
+      </div>
+
+      <div class="px-6 py-4 border-t border-slate-800 flex justify-end gap-3">
+        <button onclick={() => { pairModal = null; }}
+          class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors">
+          {t('common.cancel')}
+        </button>
+        <button onclick={claim} disabled={pairStatus === 'loading'}
+          class="px-5 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-2">
+          {#if pairStatus === 'loading'}
+            <span class="animate-spin text-xs">⟳</span>
+            {t('admin.screens.pairing')}
+          {:else}
+            {t('admin.screens.pairBtn')}
+          {/if}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- ══ Modal édition écran ══ -->
 {#if editDisplay}
