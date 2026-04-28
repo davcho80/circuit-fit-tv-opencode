@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import { schedules as api, type Schedule, type ScheduleCreate } from '$lib/api.js';
+  import { studioSettings } from '$lib/settings.svelte.js';
 
   let { data } = $props();
 
@@ -32,7 +33,7 @@
       circuitId:  '',
       name:       '',
       daysOfWeek: [],
-      timezone:   'America/Montreal',
+      timezone:   studioSettings.timezone || 'America/Montreal',
       startDate:  today(),
       endDate:    null,
       isActive:   true,
@@ -465,23 +466,10 @@
           {/if}
         </div>
 
-        <!-- Timezone -->
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Fuseau horaire</label>
-          <select
-            bind:value={base.timezone}
-            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
-          >
-            <option value="America/Montreal">America/Montreal (EST/EDT)</option>
-            <option value="America/Toronto">America/Toronto</option>
-            <option value="America/Vancouver">America/Vancouver (PST/PDT)</option>
-            <option value="America/New_York">America/New_York</option>
-            <option value="America/Chicago">America/Chicago</option>
-            <option value="America/Denver">America/Denver</option>
-            <option value="America/Los_Angeles">America/Los_Angeles</option>
-            <option value="Europe/Paris">Europe/Paris</option>
-            <option value="UTC">UTC</option>
-          </select>
+        <!-- Timezone (héritée des paramètres studio — modifiable dans Admin → Studio) -->
+        <div class="text-xs text-slate-500">
+          Fuseau : <span class="text-slate-400">{base.timezone}</span>
+          <a href="/admin" class="ml-2 text-sky-500 hover:text-sky-400">Modifier ›</a>
         </div>
 
         <!-- Dates -->

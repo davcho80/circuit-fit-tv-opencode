@@ -367,12 +367,14 @@ export interface StudioSettings {
   studioName:   string;
   primaryColor: string;
   logoUrl:      string | null;
+  timezone:     string;
 }
 
 export interface SettingsPatch {
   studioName?:   string;
   primaryColor?: string;
   logoUrl?:      string | null;
+  timezone?:     string;
 }
 
 // ---- Settings ----

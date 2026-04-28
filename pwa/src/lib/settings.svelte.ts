@@ -7,6 +7,7 @@ export interface StudioSettings {
   studioName:   string;
   primaryColor: string;
   logoUrl:      string | null;
+  timezone:     string;
 }
 
 const defaults: StudioSettings = {
@@ -14,6 +15,7 @@ const defaults: StudioSettings = {
   studioName:   'Circuit Fit TV',
   primaryColor: '#0ea5e9',
   logoUrl:      null,
+  timezone:     'America/Montreal',
 };
 
 const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';

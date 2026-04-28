@@ -183,6 +183,7 @@ model StudioSettings {
   studioName   String  @default("Circuit Fit TV") @db.VarChar(100)
   primaryColor String  @default("#0ea5e9") @db.VarChar(7)
   logoUrl      String?
+  timezone     String  @default("America/Montreal") @db.VarChar(60)
 }
 
 // ----- User -----

@@ -15,6 +15,7 @@ const SettingsPatch = z.object({
   studioName:   z.string().min(1).max(100).optional(),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Format #RRGGBB attendu').optional(),
   logoUrl:      z.string().url().nullable().optional(),
+  timezone:     z.string().min(1).max(60).optional(),
 }).refine((d) => Object.values(d).some((v) => v !== undefined), 'Au moins un champ requis');
 
 async function getOrCreate() {
@@ -40,6 +41,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     if (body.data.studioName   !== undefined) data.studioName   = body.data.studioName;
     if (body.data.primaryColor !== undefined) data.primaryColor = body.data.primaryColor;
     if (body.data.logoUrl      !== undefined) data.logoUrl      = body.data.logoUrl;
+    if (body.data.timezone     !== undefined) data.timezone     = body.data.timezone;
 
     const updated = await prisma.studioSettings.upsert({
       where:  { id: 'singleton' },

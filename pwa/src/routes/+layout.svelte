@@ -63,10 +63,6 @@
     { href: '/sessions',  label: t('nav.history'),   icon: '📋' },
     { href: '/stats',     label: t('nav.stats'),     icon: '📈' },
     { href: '/schedule',  label: t('nav.calendar'),  icon: '📅' },
-    { href: '/screens',   label: t('nav.screens'),   icon: '📺' },
-    { href: '/tv',          label: t('nav.tvStation'),  icon: '🖥️' },
-    { href: '/tv/central',  label: t('nav.tvCentral'),  icon: '📊' },
-    { href: '/tv/schedule', label: t('nav.tvSchedule'), icon: '📅' },
   ]);
 </script>
 
@@ -106,24 +102,14 @@
 
         {#if authStore.isAdmin}
           <a
-            href="/users"
+            href="/admin"
             class="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0
-              {$page.url.pathname.startsWith('/users')
-                ? 'bg-sky-500/20 text-sky-300'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}"
-          >
-            <span>👥</span>
-            <span>{t('nav.users')}</span>
-          </a>
-          <a
-            href="/settings"
-            class="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md transition-colors shrink-0
-              {$page.url.pathname.startsWith('/settings')
+              {$page.url.pathname.startsWith('/admin')
                 ? 'bg-sky-500/20 text-sky-300'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}"
           >
             <span>⚙️</span>
-            <span>{t('nav.settings')}</span>
+            <span>{t('nav.admin')}</span>
           </a>
         {/if}
       </div>
@@ -192,10 +178,10 @@
                     <span class="text-base">🔑</span>{t('user.changePassword')}
                   </button>
                   {#if authStore.isAdmin}
-                    <button onclick={() => { closeMenu(); goto('/users'); }}
+                    <button onclick={() => { closeMenu(); goto('/admin'); }}
                       class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300
                              hover:bg-slate-800 hover:text-slate-100 transition-colors text-left">
-                      <span class="text-base">👥</span>{t('user.manageUsers')}
+                      <span class="text-base">⚙️</span>{t('nav.admin')}
                     </button>
                   {/if}
                   <div class="mx-3 my-1.5 border-t border-slate-800"></div>
