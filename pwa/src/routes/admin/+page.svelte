@@ -124,7 +124,7 @@
 
   async function claim() {
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-      pairError = 'Le code doit être composé de 4 chiffres.';
+      pairError = t('admin.screens.pinError');
       pairStatus = 'error';
       return;
     }
@@ -147,7 +147,7 @@
       await refreshScreens();
       setTimeout(() => { pairStatus = 'idle'; }, 4000);
     } catch {
-      pairError  = 'Impossible de joindre le serveur.';
+      pairError  = t('admin.screens.serverError');
       pairStatus = 'error';
     }
   }
@@ -210,27 +210,28 @@
     await refreshScreens();
   }
 
-  const ROLE_LABEL: Record<DisplayRole, string> = {
-    STATION:    'Station',
-    CENTRAL:    'Central',
-    UNASSIGNED: 'Non assigné',
-  };
   const ROLE_ICON: Record<DisplayRole, string> = {
     STATION:    '🏋️',
     CENTRAL:    '📊',
     UNASSIGNED: '❓',
   };
 
+  const roleLabel = $derived<Record<DisplayRole, string>>({
+    STATION:    'Station',
+    CENTRAL:    'Central',
+    UNASSIGNED: t('admin.screens.unassigned'),
+  });
+
   function isOnline(d: Display): boolean { return onlineIds.has(d.id); }
 
   function lastSeenLabel(iso: string | null): string {
-    if (!iso) return 'Jamais vu';
+    if (!iso) return t('admin.screens.neverSeen');
     const diff = Date.now() - new Date(iso).getTime();
     const sec  = Math.floor(diff / 1000);
-    if (sec < 60)    return 'Il y a quelques secondes';
-    if (sec < 3600)  return `Il y a ${Math.floor(sec / 60)} min`;
-    if (sec < 86400) return `Il y a ${Math.floor(sec / 3600)} h`;
-    return `Il y a ${Math.floor(sec / 86400)} j`;
+    if (sec < 60)    return t('admin.screens.fewSec');
+    if (sec < 3600)  return `${Math.floor(sec / 60)} min`;
+    if (sec < 86400) return `${Math.floor(sec / 3600)} h`;
+    return `${Math.floor(sec / 86400)} j`;
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -399,7 +400,7 @@
 
   <div>
     <h1 class="text-2xl font-bold text-slate-100">{t('admin.title')}</h1>
-    <p class="text-slate-400 text-sm mt-0.5">Configuration et gestion de Circuit Fit TV</p>
+    <p class="text-slate-400 text-sm mt-0.5">{t('admin.subtitle')}</p>
   </div>
 
   <!-- Tab bar -->
@@ -463,7 +464,7 @@
             <option value="Europe/Paris">Europe/Paris</option>
             <option value="UTC">UTC</option>
           </select>
-          <p class="text-xs text-slate-500 mt-1.5">Utilisé pour le calendrier et les horaires automatiques.</p>
+          <p class="text-xs text-slate-500 mt-1.5">{t('admin.timezone.hint')}</p>
         </div>
 
         <!-- Couleur principale -->
@@ -488,10 +489,10 @@
             />
             <div class="h-8 px-4 rounded-lg text-white text-sm font-medium flex items-center"
                  style="background-color: {primaryColor}">
-              Aperçu
+              {t('admin.studio.preview')}
             </div>
           </div>
-          <p class="text-xs text-slate-500 mt-1.5">Couleur appliquée aux boutons et accents sur les écrans TV.</p>
+          <p class="text-xs text-slate-500 mt-1.5">{t('admin.studio.colorHint')}</p>
         </div>
 
         <!-- Logo -->
@@ -504,7 +505,7 @@
             <div class="flex items-center gap-4 mb-3">
               <img src={studioSettings.logoUrl} alt="Logo" class="h-16 w-auto rounded-lg bg-slate-800 p-2 object-contain" />
               <button onclick={removeLogo} class="text-xs text-red-400 hover:text-red-300 transition-colors">
-                Supprimer le logo
+                {t('admin.studio.removeLogo')}
               </button>
             </div>
           {/if}
@@ -525,7 +526,7 @@
             <span>{t('settings.logoUpload')}</span>
             <input type="file" accept="image/*" onchange={handleFileChange} class="hidden" />
           </label>
-          <p class="text-xs text-slate-500 mt-1.5">PNG, SVG ou JPEG recommandé. Fond transparent pour PNG/SVG.</p>
+          <p class="text-xs text-slate-500 mt-1.5">{t('admin.studio.logoHint')}</p>
 
           {#if uploading}
             <div class="mt-2">
@@ -548,7 +549,7 @@
             class="bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-500
                    text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors"
           >
-            {saving ? 'Enregistrement…' : t('settings.save')}
+            {saving ? t('common.saving') : t('settings.save')}
           </button>
           {#if savedMsg}
             <span class="text-emerald-400 text-sm flex items-center gap-1.5">
@@ -560,7 +561,7 @@
 
       <!-- Prévisualisation TV -->
       <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Aperçu écran TV</h2>
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">{t('admin.studio.tvPreview')}</h2>
         <div class="rounded-xl overflow-hidden border border-slate-700 aspect-video bg-slate-950 relative flex items-center justify-center">
           {#if studioSettings.logoUrl || logoPreview}
             <img
@@ -571,7 +572,7 @@
           {/if}
           <div class="text-center">
             <p class="text-2xl font-bold" style="color: {primaryColor}">{studioName || studioSettings.studioName}</p>
-            <p class="text-slate-400 text-sm mt-1">Écran TV</p>
+            <p class="text-slate-400 text-sm mt-1">{t('admin.studio.tvScreen')}</p>
           </div>
           <div class="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg text-white text-xs font-bold"
                style="background-color: {primaryColor}">
@@ -591,12 +592,12 @@
 
       <!-- Liste des écrans -->
       <section>
-        <h2 class="text-lg font-bold text-slate-100 mb-1">Écrans connectés</h2>
-        <p class="text-slate-400 text-sm mb-5">Gérez les téléviseurs connectés à Circuit Fit TV.</p>
+        <h2 class="text-lg font-bold text-slate-100 mb-1">{t('admin.screens.title')}</h2>
+        <p class="text-slate-400 text-sm mb-5">{t('admin.screens.subtitle')}</p>
 
         {#if displays.length === 0}
           <div class="text-slate-500 text-sm py-10 text-center border border-slate-800 rounded-xl">
-            Aucun écran connecté. Apairez votre première TV ci-dessous.
+            {t('admin.screens.none')}
           </div>
         {:else}
           <div class="space-y-2">
@@ -608,13 +609,13 @@
                     <span class="font-semibold text-slate-100">{d.name}</span>
                     <span class="flex items-center gap-1 text-xs font-medium">
                       <span class="w-1.5 h-1.5 rounded-full {isOnline(d) ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
-                      <span class="{isOnline(d) ? 'text-emerald-400' : 'text-slate-500'}">{isOnline(d) ? 'En ligne' : 'Hors ligne'}</span>
+                      <span class="{isOnline(d) ? 'text-emerald-400' : 'text-slate-500'}">{isOnline(d) ? t('admin.screens.online') : t('admin.screens.offline')}</span>
                     </span>
                     <span class="text-xs px-2 py-0.5 rounded-full font-medium
                       {d.role === 'STATION'    ? 'bg-sky-900/50 text-sky-300' :
                        d.role === 'CENTRAL'    ? 'bg-violet-900/50 text-violet-300' :
                                                  'bg-slate-800 text-slate-400'}">
-                      {ROLE_LABEL[d.role]}{d.role === 'STATION' && d.stationNumber != null ? ` #${d.stationNumber}` : ''}
+                      {roleLabel[d.role]}{d.role === 'STATION' && d.stationNumber != null ? ` #${d.stationNumber}` : ''}
                     </span>
                   </div>
                   <div class="text-xs text-slate-500 mt-0.5 flex gap-3 flex-wrap">
@@ -642,15 +643,13 @@
 
       <!-- Formulaire appairage -->
       <section>
-        <h2 class="text-lg font-bold text-slate-100 mb-1">Connecter un nouvel écran</h2>
-        <p class="text-slate-400 mb-4 text-sm">
-          Sur la TV, appuyez sur "Obtenir un code", scannez le QR ou entrez le code manuellement.
-        </p>
+        <h2 class="text-lg font-bold text-slate-100 mb-1">{t('admin.screens.pairTitle')}</h2>
+        <p class="text-slate-400 mb-4 text-sm">{t('admin.screens.pairDesc')}</p>
 
         <div class="space-y-5 max-w-lg">
 
           <div class="space-y-1.5">
-            <label for="pin" class="block text-sm font-medium text-slate-300">Code affiché sur la TV</label>
+            <label for="pin" class="block text-sm font-medium text-slate-300">{t('admin.screens.pinLabel')}</label>
             <input
               id="pin"
               bind:value={pin}
@@ -665,11 +664,11 @@
           </div>
 
           <div class="space-y-1.5">
-            <p class="text-sm font-medium text-slate-300">Type d'écran</p>
+            <p class="text-sm font-medium text-slate-300">{t('admin.screens.typeLabel')}</p>
             <div class="grid grid-cols-2 gap-3">
               {#each [
-                { value: 'STATION', icon: '🏋️', label: 'Station',  desc: "Exercices & timer" },
-                { value: 'CENTRAL', icon: '📊', label: 'Central',  desc: "Vue d'ensemble"   },
+                { value: 'STATION', icon: '🏋️', label: 'Station', desc: t('admin.screens.stationDesc') },
+                { value: 'CENTRAL', icon: '📊', label: 'Central', desc: t('admin.screens.centralDesc') },
               ] as opt}
                 <button
                   onclick={() => { screenType = opt.value as 'STATION' | 'CENTRAL'; }}
@@ -688,7 +687,7 @@
 
           <div class="space-y-4">
             <div class="space-y-1.5">
-              <label for="screen-label" class="block text-sm font-medium text-slate-300">Nom de cet écran</label>
+              <label for="screen-label" class="block text-sm font-medium text-slate-300">{t('admin.screens.nameLabel')}</label>
               <input
                 id="screen-label"
                 bind:value={label}
@@ -699,7 +698,7 @@
 
             {#if screenType === 'STATION'}
               <div class="space-y-1.5">
-                <p class="block text-sm font-medium text-slate-300">Numéro de station</p>
+                <p class="block text-sm font-medium text-slate-300">{t('admin.screens.stationNum')}</p>
                 <div class="flex items-center gap-3">
                   <button
                     onclick={() => { if (stationNumber > 1) stationNumber--; }}
@@ -714,11 +713,11 @@
               </div>
 
               <div class="space-y-1.5">
-                <p class="text-sm font-medium text-slate-300">Orientation</p>
+                <p class="text-sm font-medium text-slate-300">{t('admin.screens.orientation')}</p>
                 <div class="grid grid-cols-2 gap-3">
                   {#each [
-                    { value: true,  icon: '▬', label: 'Paysage',  desc: 'TV horizontale' },
-                    { value: false, icon: '▮', label: 'Portrait', desc: 'TV verticale'   },
+                    { value: true,  icon: '▬', label: t('admin.screens.landscape'), desc: t('admin.screens.landscapeDesc') },
+                    { value: false, icon: '▮', label: t('admin.screens.portrait'),  desc: t('admin.screens.portraitDesc')  },
                   ] as opt}
                     <button
                       onclick={() => { isLandscape = opt.value; }}
@@ -740,7 +739,7 @@
           {#if pairStatus === 'success'}
             <div class="py-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40
                         text-emerald-300 font-bold text-center text-lg">
-              ✓ Écran configuré avec succès !
+              {t('admin.screens.success')}
             </div>
           {:else}
             <button
@@ -751,7 +750,7 @@
                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                        : 'bg-sky-500 hover:bg-sky-400 text-white'}"
             >
-              {pairStatus === 'loading' ? 'Connexion…' : 'Connecter cet écran'}
+              {pairStatus === 'loading' ? t('admin.screens.pairing') : t('admin.screens.pairBtn')}
             </button>
           {/if}
 
@@ -772,9 +771,9 @@
 
       <div class="grid gap-3">
         {#each [
-          { href: '/tv',          icon: '🏋️', label: t('admin.tv.station'),  desc: 'Affichage station individuelle' },
-          { href: '/tv/central',  icon: '📊', label: t('admin.tv.central'),  desc: 'Vue centrale de toutes les stations' },
-          { href: '/tv/schedule', icon: '📅', label: t('admin.tv.schedule'), desc: 'Calendrier des séances TV' },
+          { href: '/tv',          icon: '🏋️', label: t('admin.tv.station'),  desc: t('admin.tv.stationDesc')  },
+          { href: '/tv/central',  icon: '📊', label: t('admin.tv.central'),  desc: t('admin.tv.centralDesc')  },
+          { href: '/tv/schedule', icon: '📅', label: t('admin.tv.schedule'), desc: t('admin.tv.scheduleDesc') },
         ] as item}
           <a
             href={item.href}
@@ -895,7 +894,7 @@
 
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-base font-semibold text-slate-100">Mises à jour</h2>
+            <h2 class="text-base font-semibold text-slate-100">{t('admin.tab.updates')}</h2>
             <p class="text-slate-500 text-xs mt-0.5">Circuit Fit TV</p>
           </div>
           {#if updatePhase === 'idle' || updatePhase === 'up-to-date' || updatePhase === 'error'}
@@ -969,14 +968,14 @@
         {:else if updatePhase === 'streaming'}
           <div class="space-y-2">
             <p class="text-sm text-amber-300 flex items-center gap-2">
-              <span class="animate-pulse">●</span> Mise à jour en cours — ne pas fermer cette page
+              <span class="animate-pulse">●</span> {t('admin.update.inProgress')}
             </p>
             <div class="bg-slate-950 rounded-lg p-3 font-mono text-xs text-slate-300 max-h-48 overflow-y-auto space-y-0.5 border border-slate-800">
               {#each updateLogs as line}
                 <div class="{line.startsWith('✅') ? 'text-emerald-400' : line.startsWith('❌') ? 'text-red-400' : 'text-slate-400'}">{line}</div>
               {/each}
               {#if updateLogs.length === 0}
-                <div class="text-slate-600 animate-pulse">En attente des logs…</div>
+                <div class="text-slate-600 animate-pulse">{t('admin.update.waiting')}</div>
               {/if}
             </div>
           </div>
@@ -1000,7 +999,7 @@
             {t('admin.update.done')} <span class="font-mono font-semibold">{updateInfo?.currentVersion}</span>
             <button onclick={() => window.location.reload()}
                     class="ml-auto text-xs text-sky-400 hover:text-sky-300 underline">
-              Recharger
+              {t('admin.update.reload')}
             </button>
           </div>
 
@@ -1024,22 +1023,22 @@
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl"
          role="dialog" aria-modal="true" aria-label="Modifier l'écran">
       <div class="px-6 pt-6 pb-4 border-b border-slate-800 flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-100">Modifier l'écran</h2>
+        <h2 class="text-lg font-semibold text-slate-100">{t('admin.screens.editTitle')}</h2>
         <button onclick={() => { editDisplay = null; }} class="text-slate-400 hover:text-slate-100 text-xl leading-none">×</button>
       </div>
       <div class="px-6 py-5 space-y-5">
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5" for="edit-name">Nom</label>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5" for="edit-name">{t('common.name')}</label>
           <input id="edit-name" bind:value={editName}
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600" />
         </div>
         <div>
-          <p class="text-sm font-medium text-slate-300 mb-2">Rôle</p>
+          <p class="text-sm font-medium text-slate-300 mb-2">{t('common.role')}</p>
           <div class="grid grid-cols-3 gap-2">
             {#each [
-              { value: 'STATION',    icon: '🏋️', label: 'Station'     },
-              { value: 'CENTRAL',    icon: '📊', label: 'Central'     },
-              { value: 'UNASSIGNED', icon: '❓', label: 'Non assigné' },
+              { value: 'STATION',    icon: '🏋️', label: 'Station'                     },
+              { value: 'CENTRAL',    icon: '📊', label: 'Central'                     },
+              { value: 'UNASSIGNED', icon: '❓', label: t('admin.screens.unassigned') },
             ] as opt}
               <button type="button" onclick={() => { editRole = opt.value as DisplayRole; }}
                 class="flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-medium transition-all
@@ -1054,7 +1053,7 @@
         </div>
         {#if editRole === 'STATION'}
           <div>
-            <p class="text-sm font-medium text-slate-300 mb-2">Numéro de station</p>
+            <p class="text-sm font-medium text-slate-300 mb-2">{t('admin.screens.stationNum')}</p>
             <div class="flex items-center gap-3">
               <button onclick={() => { if (editStation > 1) editStation--; }}
                 class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-lg font-bold hover:bg-slate-700 transition-colors">−</button>
@@ -1070,10 +1069,10 @@
       </div>
       <div class="px-6 py-4 border-t border-slate-800 flex justify-end gap-3">
         <button onclick={() => { editDisplay = null; }}
-          class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors">Annuler</button>
+          class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors">{t('common.cancel')}</button>
         <button onclick={saveEdit} disabled={editSaving}
           class="px-5 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg transition-colors">
-          {editSaving ? 'Enregistrement…' : 'Enregistrer'}
+          {editSaving ? t('common.saving') : t('common.save')}
         </button>
       </div>
     </div>
@@ -1087,13 +1086,13 @@
        onclick={(e) => { if (e.target === e.currentTarget) deleteDisplayId = null; }}>
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
       <div class="text-4xl">🗑️</div>
-      <p class="text-slate-200 font-medium">Supprimer cet écran ?</p>
-      <p class="text-slate-400 text-sm">L'écran devra être re-apairé pour se reconnecter.</p>
+      <p class="text-slate-200 font-medium">{t('admin.screens.deleteTitle')}</p>
+      <p class="text-slate-400 text-sm">{t('admin.screens.deleteHint')}</p>
       <div class="flex gap-3 justify-center pt-2">
         <button onclick={() => { deleteDisplayId = null; }}
-          class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-100 bg-slate-800 rounded-lg transition-colors">Annuler</button>
+          class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-100 bg-slate-800 rounded-lg transition-colors">{t('common.cancel')}</button>
         <button onclick={confirmDeleteDisplay}
-          class="px-4 py-2 text-sm font-medium bg-red-700 hover:bg-red-600 text-white rounded-lg transition-colors">Supprimer</button>
+          class="px-4 py-2 text-sm font-medium bg-red-700 hover:bg-red-600 text-white rounded-lg transition-colors">{t('common.delete')}</button>
       </div>
     </div>
   </div>
@@ -1118,7 +1117,7 @@
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-100
                    focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
             <option value="COACH">Coach</option>
-            <option value="ADMIN">Administrateur</option>
+            <option value="ADMIN">{t('users.adminOption')}</option>
           </select>
         </div>
         <div>
