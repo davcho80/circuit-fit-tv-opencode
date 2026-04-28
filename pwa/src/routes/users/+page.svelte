@@ -4,6 +4,7 @@
   import type { UserPublic } from '$lib/api.js';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { t } from '$lib/i18n.svelte.js';
 
   // Redirection si non-admin
   if (!authStore.isAdmin) goto('/');
@@ -33,7 +34,7 @@
     try {
       userList = await usersApi.list();
     } catch (e) {
-      loadError = e instanceof Error ? e.message : 'Erreur de chargement';
+      loadError = e instanceof Error ? e.message : t('users.errorLoad');
     }
   }
 
@@ -52,7 +53,7 @@
     e.preventDefault();
     createError = '';
     if (!pwValid(newPassword)) {
-      createError = 'Le mot de passe ne respecte pas la politique de sécurité';
+      createError = t('users.pwPolicy');
       return;
     }
     creating = true;
@@ -64,7 +65,7 @@
       newRole    = 'COACH';
       await loadUsers();
     } catch (e) {
-      createError = e instanceof Error ? e.message : 'Erreur de création';
+      createError = e instanceof Error ? e.message : t('users.errorCreate');
     } finally {
       creating = false;
     }
@@ -95,7 +96,7 @@
     if (!resetTarget) return;
     resetError = '';
     if (!pwValid(resetPassword)) {
-      resetError = 'Le mot de passe ne respecte pas la politique de sécurité';
+      resetError = t('users.pwPolicy');
       return;
     }
     resetting = true;
@@ -129,14 +130,14 @@
 
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold text-slate-100">Utilisateurs</h1>
-      <p class="text-slate-400 text-sm mt-0.5">Gestion des accès à la console</p>
+      <h1 class="text-2xl font-bold text-slate-100">{t('users.title')}</h1>
+      <p class="text-slate-400 text-sm mt-0.5">{t('users.subtitle')}</p>
     </div>
     <button
       onclick={() => { showModal = true; createError = ''; }}
       class="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
     >
-      + Nouvel utilisateur
+      + {t('users.new')}
     </button>
   </div>
 
@@ -147,16 +148,16 @@
   <!-- Table -->
   <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
     {#if userList.length === 0}
-      <p class="text-slate-500 text-sm p-6">Aucun utilisateur.</p>
+      <p class="text-slate-500 text-sm p-6">{t('users.empty')}</p>
     {:else}
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-800">
-            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">Courriel</th>
-            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">Rôle</th>
-            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">Créé le</th>
-            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">Dernier login</th>
-            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">Statut</th>
+            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">{t('users.col.email')}</th>
+            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">{t('users.col.role')}</th>
+            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">{t('users.col.created')}</th>
+            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">{t('users.col.lastLogin')}</th>
+            <th class="text-left text-xs font-medium text-slate-500 uppercase tracking-widest px-5 py-3">{t('users.col.status')}</th>
             <th class="px-5 py-3"></th>
           </tr>
         </thead>
@@ -175,9 +176,9 @@
               </td>
               <td class="px-5 py-3.5">
                 {#if u.mustChangePassword}
-                  <span class="text-xs text-amber-400 font-medium">Mdp temporaire</span>
+                  <span class="text-xs text-amber-400 font-medium">{t('users.tempPw')}</span>
                 {:else}
-                  <span class="text-xs text-emerald-400">Actif</span>
+                  <span class="text-xs text-emerald-400">{t('users.active')}</span>
                 {/if}
               </td>
               <td class="px-5 py-3.5">
@@ -189,7 +190,7 @@
                       class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors"
                       title="Changer le rôle"
                     >
-                      {u.role === 'ADMIN' ? '→ Coach' : '→ Admin'}
+                      {u.role === 'ADMIN' ? t('users.toCoach') : t('users.toAdmin')}
                     </button>
                   {/if}
                   <!-- Reset mot de passe -->
@@ -198,7 +199,7 @@
                     class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors"
                     title="Réinitialiser le mot de passe"
                   >
-                    Réinitialiser
+                    {t('users.reset')}
                   </button>
                   <!-- Supprimer (sauf soi-même) -->
                   {#if u.id !== authStore.user?.id}
@@ -206,7 +207,7 @@
                       onclick={() => handleDelete(u)}
                       class="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-950/30 hover:bg-red-950/50 transition-colors"
                     >
-                      Supprimer
+                      {t('common.delete')}
                     </button>
                   {/if}
                 </div>
@@ -223,10 +224,10 @@
 {#if showModal}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-      <h2 class="text-lg font-semibold text-slate-100 mb-5">Nouvel utilisateur</h2>
+      <h2 class="text-lg font-semibold text-slate-100 mb-5">{t('users.new')}</h2>
       <form onsubmit={handleCreate} class="space-y-4">
         <div>
-          <label for="new-email" class="block text-sm font-medium text-slate-300 mb-1.5">Courriel</label>
+          <label for="new-email" class="block text-sm font-medium text-slate-300 mb-1.5">{t('users.col.email')}</label>
           <input
             id="new-email"
             type="email"
@@ -238,7 +239,7 @@
           />
         </div>
         <div>
-          <label for="new-role" class="block text-sm font-medium text-slate-300 mb-1.5">Rôle</label>
+          <label for="new-role" class="block text-sm font-medium text-slate-300 mb-1.5">{t('common.role')}</label>
           <select
             id="new-role"
             bind:value={newRole}
@@ -251,8 +252,8 @@
         </div>
         <div>
           <label for="new-pw" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Mot de passe initial
-            <span class="text-slate-500 font-normal">(doit être changé au premier login)</span>
+            {t('users.initPwLabel')}
+            <span class="text-slate-500 font-normal">{t('users.initPwHint')}</span>
           </label>
           <input
             id="new-pw"
@@ -264,9 +265,7 @@
                    placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
             placeholder="••••••••••••"
           />
-          <p class="text-xs text-slate-500 mt-1.5">
-            Min. 8 car., majuscule, minuscule, chiffre, caractère spécial
-          </p>
+          <p class="text-xs text-slate-500 mt-1.5">{t('users.pwHint')}</p>
         </div>
 
         {#if createError}
@@ -281,7 +280,7 @@
             onclick={() => showModal = false}
             class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 rounded-lg text-sm transition-colors"
           >
-            Annuler
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -289,7 +288,7 @@
             class="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-500
                    text-white font-semibold py-2.5 rounded-lg text-sm transition-colors"
           >
-            {creating ? 'Création…' : 'Créer'}
+            {creating ? t('users.creating') : t('common.create')}
           </button>
         </div>
       </form>
@@ -301,11 +300,11 @@
 {#if resetTarget}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-      <h2 class="text-lg font-semibold text-slate-100 mb-1">Réinitialiser le mot de passe</h2>
+      <h2 class="text-lg font-semibold text-slate-100 mb-1">{t('users.resetTitle')}</h2>
       <p class="text-slate-400 text-sm mb-5">{resetTarget.email}</p>
       <form onsubmit={handleReset} class="space-y-4">
         <div>
-          <label for="reset-pw" class="block text-sm font-medium text-slate-300 mb-1.5">Nouveau mot de passe temporaire</label>
+          <label for="reset-pw" class="block text-sm font-medium text-slate-300 mb-1.5">{t('users.newTempPw')}</label>
           <input
             id="reset-pw"
             type="password"
@@ -316,9 +315,7 @@
                    placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
             placeholder="••••••••••••"
           />
-          <p class="text-xs text-slate-500 mt-1.5">
-            Min. 8 car., majuscule, minuscule, chiffre, caractère spécial
-          </p>
+          <p class="text-xs text-slate-500 mt-1.5">{t('users.pwHint')}</p>
         </div>
 
         {#if resetError}
@@ -333,7 +330,7 @@
             onclick={() => { resetTarget = null; }}
             class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 rounded-lg text-sm transition-colors"
           >
-            Annuler
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -341,7 +338,7 @@
             class="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-500
                    text-white font-semibold py-2.5 rounded-lg text-sm transition-colors"
           >
-            {resetting ? 'Enregistrement…' : 'Réinitialiser'}
+            {resetting ? t('users.saving') : t('users.reset')}
           </button>
         </div>
       </form>

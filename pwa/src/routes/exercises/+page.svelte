@@ -2,14 +2,15 @@
   import type { PageProps } from './$types';
   import { invalidateAll } from '$app/navigation';
   import { exercises as api } from '$lib/api';
+  import { t } from '$lib/i18n.svelte.js';
 
   let { data }: PageProps = $props();
 
-  const difficultyLabel: Record<string, string> = {
-    BEGINNER: 'Débutant',
-    INTERMEDIATE: 'Intermédiaire',
-    ADVANCED: 'Avancé',
-  };
+  const difficultyLabel = $derived<Record<string, string>>({
+    BEGINNER: t('ex.difficulty.beginner'),
+    INTERMEDIATE: t('ex.difficulty.intermediate'),
+    ADVANCED: t('ex.difficulty.advanced'),
+  });
 
   const difficultyColor: Record<string, string> = {
     BEGINNER: 'bg-emerald-900/50 text-emerald-300',
@@ -48,7 +49,7 @@
              px-4 py-2 rounded-lg transition-colors text-sm"
     >
       <span class="text-base">+</span>
-      Nouvel exercice
+      {t('ex.new')}
     </a>
   </div>
 
@@ -56,8 +57,8 @@
   {#if data.exercises.length === 0}
     <div class="text-center py-20 text-slate-500">
       <p class="text-4xl mb-3">🏋️</p>
-      <p class="text-lg font-medium">Aucun exercice</p>
-      <p class="text-sm mt-1">Créez votre premier exercice pour commencer.</p>
+      <p class="text-lg font-medium">{t('ex.empty')}</p>
+      <p class="text-sm mt-1">{t('ex.emptyDesc')}</p>
     </div>
   {:else}
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">

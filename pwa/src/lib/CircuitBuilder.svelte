@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
   import type { Circuit, CircuitCreate, Exercise } from './api';
+  import { t } from './i18n.svelte.js';
 
   interface Props {
     initial?: Circuit;
@@ -116,7 +117,7 @@
   }
 
   function stationLabel(s: LocalStation): string {
-    if (s.exerciseIds.length === 0) return 'Aucun exercice';
+    if (s.exerciseIds.length === 0) return t('cb.noExercise');
     return s.exerciseIds
       .map((id) => exerciseById(id)?.name ?? '?')
       .join(' / ');
@@ -173,11 +174,11 @@
 
     <!-- ======== COLONNE GAUCHE : paramètres ======== -->
     <div class="space-y-5">
-      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Paramètres</h2>
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">{t('cb.params')}</h2>
 
       <!-- Nom -->
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1" for="c-name">Nom *</label>
+        <label class="block text-sm font-medium text-slate-300 mb-1" for="c-name">{t('cb.name')}</label>
         <input
           id="c-name"
           type="text"
@@ -192,7 +193,7 @@
       <!-- Icône (emoji) -->
       <div>
         <label class="block text-sm font-medium text-slate-300 mb-1" for="c-icon">
-          Icône <span class="text-slate-500 font-normal text-xs ml-1">affiché sur le calendrier TV</span>
+          {t('cb.icon')} <span class="text-slate-500 font-normal text-xs ml-1">{t('cb.iconHint')}</span>
         </label>
         <div class="flex items-center gap-3">
           <div class="w-12 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center
@@ -208,18 +209,18 @@
             class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-xl
                    text-center focus:outline-none focus:border-sky-500"
           />
-          <p class="text-xs text-slate-500">Coller un emoji (ex : 🔥 🏃 💪)</p>
+          <p class="text-xs text-slate-500">{t('cb.iconDesc')}</p>
         </div>
       </div>
 
       <!-- Description -->
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1" for="c-desc">Description</label>
+        <label class="block text-sm font-medium text-slate-300 mb-1" for="c-desc">{t('cb.desc')}</label>
         <textarea
           id="c-desc"
           bind:value={description}
           maxlength="500" rows="2"
-          placeholder="Notes pour le coach…"
+          placeholder={t('cb.descPlaceholder')}
           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100
                  placeholder:text-slate-500 focus:outline-none focus:border-sky-500 text-sm resize-none"
         ></textarea>
@@ -228,7 +229,7 @@
       <!-- Rounds -->
       <div>
         <label class="block text-sm font-medium text-slate-300 mb-2" for="c-rounds">
-          Rounds — <span class="text-sky-400 font-semibold">{rounds}</span>
+          {t('cb.rounds')} — <span class="text-sky-400 font-semibold">{rounds}</span>
         </label>
         <input id="c-rounds" type="range" min="1" max="10" bind:value={rounds}
                class="w-full accent-sky-500" />
@@ -240,19 +241,19 @@
       <!-- Timings -->
       <div class="grid grid-cols-3 gap-3">
         <div>
-          <label class="block text-xs font-medium text-slate-400 mb-1" for="c-work">Travail (s)</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1" for="c-work">{t('cb.work')}</label>
           <input id="c-work" type="number" min={5} max={600} bind:value={workSec}
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2
                    text-slate-100 text-sm text-center focus:outline-none focus:border-sky-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-400 mb-1" for="c-rest">Repos (s)</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1" for="c-rest">{t('cb.rest')}</label>
           <input id="c-rest" type="number" min={0} max={300} bind:value={restSec}
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2
                    text-slate-100 text-sm text-center focus:outline-none focus:border-sky-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-400 mb-1" for="c-trans">Transition (s)</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1" for="c-trans">{t('cb.transition')}</label>
           <input id="c-trans" type="number" min={0} max={60} bind:value={transitionSec}
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2
                    text-slate-100 text-sm text-center focus:outline-none focus:border-sky-500" />
@@ -262,7 +263,7 @@
       <!-- Pauses eau programmées -->
       <div class="space-y-2">
         <div class="flex items-center justify-between">
-          <span class="text-sm font-medium text-slate-300">💧 Pauses eau</span>
+          <span class="text-sm font-medium text-slate-300">{t('cb.breaks')}</span>
           <button
             type="button"
             onclick={addBreak}
@@ -271,20 +272,18 @@
                    text-slate-300 hover:text-cyan-200 px-2.5 py-1 rounded-lg transition-colors
                    border border-slate-700"
           >
-            + Ajouter
+            {t('cb.addBreak')}
           </button>
         </div>
 
         {#if scheduledBreaks.length === 0}
-          <p class="text-xs text-slate-500 italic">
-            Aucune pause programmée. Les participants boivent entre les rounds si besoin.
-          </p>
+          <p class="text-xs text-slate-500 italic">{t('cb.noBreaks')}</p>
         {:else}
           <div class="space-y-1.5">
             {#each scheduledBreaks as brk, idx}
               <div class="flex items-center gap-2 bg-slate-800/60 rounded-lg px-3 py-2 border border-slate-700/50">
                 <span class="text-cyan-400 text-sm shrink-0">💧</span>
-                <span class="text-xs text-slate-400 shrink-0">Après round</span>
+                <span class="text-xs text-slate-400 shrink-0">{t('cb.afterRound')}</span>
                 <select
                   bind:value={brk.afterRound}
                   class="bg-slate-700 border border-slate-600 rounded px-2 py-1
@@ -317,11 +316,11 @@
 
       <!-- Rotation mode -->
       <div>
-        <span class="block text-sm font-medium text-slate-300 mb-2">Mode rotation</span>
+        <span class="block text-sm font-medium text-slate-300 mb-2">{t('cb.rotMode')}</span>
         <div class="grid grid-cols-2 gap-2">
           {#each [
-            { value: 'CLASSIC', label: 'Classique', desc: 'Tout le monde tourne à chaque buzzer' },
-            { value: 'FIXED', label: 'Fixe', desc: 'Chacun reste à sa station' },
+            { value: 'CLASSIC', label: t('cb.rotClassic'), desc: t('cb.rotClassicDesc') },
+            { value: 'FIXED', label: t('cb.rotFixed'), desc: t('cb.rotFixedDesc') },
           ] as m}
             <label class="flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors
                           {rotationMode === m.value
@@ -338,7 +337,7 @@
 
       <!-- Durée estimée -->
       <div class="bg-slate-800/50 rounded-lg p-3 text-sm text-slate-400">
-        ⏱ Durée estimée :
+        {t('cb.estDuration')}
         <span class="text-slate-200 font-semibold">~{estimatedMin()} min</span>
         · {stations.length} stations · {rounds} rounds
       </div>
@@ -353,9 +352,9 @@
         class="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-slate-700 disabled:text-slate-500
                text-white font-semibold py-3 rounded-lg transition-colors text-sm"
       >
-        {#if saving}Enregistrement…
+        {#if saving}{t('cb.saving')}
         {:else if !isValid && stations.some((s) => s.exerciseIds.length === 0)}
-          Assigner tous les exercices
+          {t('cb.assignAll')}
         {:else}
           {submitLabel}
         {/if}
@@ -366,7 +365,7 @@
     <div>
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-          Stations ({stations.length}/20)
+          {t('cb.stations')} ({stations.length}/20)
         </h2>
         <button
           type="button"
@@ -375,7 +374,7 @@
           class="text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300
                  px-3 py-1.5 rounded-lg transition-colors border border-slate-700"
         >
-          + Ajouter une station
+          {t('cb.addStation')}
         </button>
       </div>
 
@@ -410,12 +409,12 @@
                       {/if}
                     {/each}
                     <span class="text-xs text-slate-500 hover:text-sky-400 transition-colors">
-                      Modifier ›
+                      {t('cb.editExercise')}
                     </span>
                   </div>
                 {:else}
                   <span class="text-sm text-amber-400/80 flex items-center gap-1.5">
-                    <span>⚠️</span> Choisir un exercice
+                    {t('cb.pickExercise')}
                   </span>
                 {/if}
               </button>
@@ -451,7 +450,7 @@
     class="fixed inset-0 bg-black/60 z-40"
     role="button"
     tabindex="-1"
-    aria-label="Fermer le picker"
+    aria-label={t('cb.stationLabel')}
     onclick={closePicker}
     onkeydown={(e) => e.key === 'Escape' && closePicker()}
   ></div>
@@ -462,10 +461,8 @@
     <!-- En-tête picker -->
     <div class="flex items-center justify-between p-4 border-b border-slate-800">
       <div>
-        <p class="font-semibold text-slate-100">Station {idx + 1}</p>
-        <p class="text-xs text-slate-400 mt-0.5">
-          {selected.length} exercice{selected.length > 1 ? 's' : ''} sélectionné{selected.length > 1 ? 's' : ''}
-        </p>
+        <p class="font-semibold text-slate-100">{t('cb.stationLabel')} {idx + 1}</p>
+        <p class="text-xs text-slate-400 mt-0.5">({selected.length})</p>
       </div>
       <button
         onclick={closePicker}
@@ -478,7 +475,7 @@
       <input
         type="search"
         bind:value={pickerSearch}
-        placeholder="Rechercher un exercice…"
+        placeholder={t('cb.searchEx')}
         class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100
                placeholder:text-slate-500 focus:outline-none focus:border-sky-500 text-sm"
         autofocus
@@ -488,7 +485,7 @@
     <!-- Liste exercices -->
     <div class="flex-1 overflow-y-auto p-3 space-y-1">
       {#if filteredExercises.length === 0}
-        <p class="text-center text-slate-500 py-8 text-sm">Aucun exercice trouvé</p>
+        <p class="text-center text-slate-500 py-8 text-sm">{t('cb.noExFound')}</p>
       {:else}
         {#each filteredExercises as ex (ex.id)}
           {@const isSelected = selected.includes(ex.id)}

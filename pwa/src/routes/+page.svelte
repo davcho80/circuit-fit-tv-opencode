@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageProps } from './$types';
+  import { t } from '$lib/i18n.svelte.js';
 
   let { data }: PageProps = $props();
 </script>
@@ -13,7 +14,7 @@
   <!-- Hero -->
   <div class="text-center py-8">
     <h1 class="text-4xl font-black text-sky-400 tracking-tight">Circuit Fit TV</h1>
-    <p class="text-slate-400 mt-2 text-lg">Pilotez vos circuits d'entraînement multi-écrans</p>
+    <p class="text-slate-400 mt-2 text-lg">{t('home.subtitle')}</p>
   </div>
 
   <!-- Action principale -->
@@ -24,8 +25,8 @@
   >
     <div class="flex items-center justify-between">
       <div>
-        <p class="text-2xl font-bold text-white">Lancer une session</p>
-        <p class="text-white/70 mt-1">Choisir un circuit et piloter l'entraînement en direct</p>
+        <p class="text-2xl font-bold text-white">{t('home.startSession')}</p>
+        <p class="text-white/70 mt-1">{t('home.startSessionDesc')}</p>
       </div>
       <span class="text-4xl group-hover:translate-x-1 transition-transform">&#x25B6;</span>
     </div>
@@ -36,22 +37,22 @@
     <a href="/exercises" class="bg-slate-900 border border-slate-800 hover:border-slate-600
               rounded-xl p-5 transition-colors text-center">
       <p class="text-3xl font-bold text-slate-100">{data.exerciseCount}</p>
-      <p class="text-sm text-slate-400 mt-1">Exercices</p>
+      <p class="text-sm text-slate-400 mt-1">{t('nav.exercises')}</p>
     </a>
     <a href="/circuits" class="bg-slate-900 border border-slate-800 hover:border-slate-600
               rounded-xl p-5 transition-colors text-center">
       <p class="text-3xl font-bold text-slate-100">{data.circuits.length}</p>
-      <p class="text-sm text-slate-400 mt-1">Circuits</p>
+      <p class="text-sm text-slate-400 mt-1">{t('nav.circuits')}</p>
     </a>
     <a href="/tv" class="bg-slate-900 border border-slate-800 hover:border-slate-600
               rounded-xl p-5 transition-colors text-center">
       <p class="text-2xl">📺</p>
-      <p class="text-sm text-slate-400 mt-1">TV Station</p>
+      <p class="text-sm text-slate-400 mt-1">{t('nav.tvStation')}</p>
     </a>
     <a href="/tv/central" class="bg-slate-900 border border-slate-800 hover:border-slate-600
               rounded-xl p-5 transition-colors text-center">
       <p class="text-2xl">🖥️</p>
-      <p class="text-sm text-slate-400 mt-1">TV Centrale</p>
+      <p class="text-sm text-slate-400 mt-1">{t('nav.tvCentral')}</p>
     </a>
   </div>
 
@@ -59,9 +60,9 @@
   {#if data.circuits.length > 0}
     <div>
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-slate-200">Circuits</h2>
+        <h2 class="text-lg font-semibold text-slate-200">{t('nav.circuits')}</h2>
         <a href="/circuits" class="text-sm text-sky-400 hover:text-sky-300 transition-colors">
-          Voir tout
+          {t('home.seeAll')}
         </a>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -88,9 +89,9 @@
     </div>
   {:else}
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-      <p class="text-slate-400">Aucun circuit pour l'instant.</p>
+      <p class="text-slate-400">{t('home.noCircuits')}</p>
       <a href="/circuits/new" class="inline-block mt-3 text-sky-400 hover:text-sky-300 font-medium transition-colors">
-        Créer votre premier circuit
+        {t('home.createFirst')}
       </a>
     </div>
   {/if}

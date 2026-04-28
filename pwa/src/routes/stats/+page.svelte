@@ -1,5 +1,6 @@
 <script lang="ts">
   import { stats as statsApi } from '$lib/api.js';
+  import { t } from '$lib/i18n.svelte.js';
 
   let { data } = $props();
   const s = $derived(data.stats);
@@ -34,8 +35,8 @@
   <!-- En-tête -->
   <div class="flex items-start justify-between">
     <div>
-      <h1 class="text-2xl font-bold text-slate-100">Statistiques</h1>
-      <p class="text-slate-400 text-sm mt-0.5">Tableau de bord des entraînements</p>
+      <h1 class="text-2xl font-bold text-slate-100">{t('stats.title')}</h1>
+      <p class="text-slate-400 text-sm mt-0.5">{t('stats.subtitle')}</p>
     </div>
     <a
       href={statsApi.exportCsvUrl()}
@@ -43,28 +44,28 @@
       class="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200
              font-medium px-4 py-2 rounded-lg transition-colors text-sm border border-slate-700"
     >
-      ⬇️ Exporter CSV
+      ⬇️ {t('stats.exportCsv')}
     </a>
   </div>
 
   <!-- Métriques clés -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Total sessions</p>
+      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">{t('stats.total')}</p>
       <p class="text-3xl font-bold text-slate-100">{s.total}</p>
     </div>
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">7 derniers jours</p>
+      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">{t('stats.last7')}</p>
       <p class="text-3xl font-bold text-sky-400">{s.last7Days}</p>
     </div>
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Taux complétion</p>
+      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">{t('stats.completionRate')}</p>
       <p class="text-3xl font-bold {s.completionRate >= 70 ? 'text-emerald-400' : s.completionRate >= 40 ? 'text-amber-400' : 'text-red-400'}">
         {s.completionRate}%
       </p>
     </div>
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Durée moyenne</p>
+      <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">{t('stats.avgDuration')}</p>
       <p class="text-3xl font-bold text-slate-100">
         {s.avgDurationMin > 0 ? `${s.avgDurationMin} min` : '—'}
       </p>
@@ -74,7 +75,7 @@
   <!-- Graphique 30 jours -->
   <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
     <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-6">
-      Sessions — 30 derniers jours
+      {t('stats.chart30')}
     </h2>
     <div class="flex items-end gap-1 h-32">
       {#each chartDays as d}
@@ -109,10 +110,10 @@
     <!-- Top circuits -->
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4">
-        Circuits les plus utilisés
+        {t('stats.topCircuits')}
       </h2>
       {#if s.topCircuits.length === 0}
-        <p class="text-slate-500 text-sm">Aucune donnée.</p>
+        <p class="text-slate-500 text-sm">{t('stats.noData')}</p>
       {:else}
         <ol class="space-y-3">
           {#each s.topCircuits as c, i}
@@ -137,16 +138,16 @@
     <!-- Répartition terminée / arrêtée -->
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4">
-        Résultats des sessions
+        {t('stats.results')}
       </h2>
       {#if s.total === 0}
-        <p class="text-slate-500 text-sm">Aucune session enregistrée.</p>
+        <p class="text-slate-500 text-sm">{t('stats.noSessions')}</p>
       {:else}
         <div class="space-y-4">
           <!-- Terminées -->
           <div>
             <div class="flex justify-between text-sm mb-1">
-              <span class="text-emerald-400 font-medium">✅ Terminées</span>
+              <span class="text-emerald-400 font-medium">✅ {t('stats.completed')}</span>
               <span class="text-slate-300">{s.completed} <span class="text-slate-500">({s.completionRate}%)</span></span>
             </div>
             <div class="h-2.5 bg-slate-800 rounded-full">
@@ -156,7 +157,7 @@
           <!-- Arrêtées -->
           <div>
             <div class="flex justify-between text-sm mb-1">
-              <span class="text-slate-400 font-medium">⏹ Arrêtées</span>
+              <span class="text-slate-400 font-medium">⏹ {t('stats.aborted')}</span>
               <span class="text-slate-300">{s.aborted} <span class="text-slate-500">({abortedPct}%)</span></span>
             </div>
             <div class="h-2.5 bg-slate-800 rounded-full">
@@ -168,11 +169,11 @@
           <div class="pt-4 border-t border-slate-800 grid grid-cols-2 gap-4">
             <div class="text-center">
               <p class="text-2xl font-bold text-sky-400">{s.last7Days}</p>
-              <p class="text-xs text-slate-500 mt-0.5">7 derniers jours</p>
+              <p class="text-xs text-slate-500 mt-0.5">{t('stats.last7')}</p>
             </div>
             <div class="text-center">
               <p class="text-2xl font-bold text-slate-300">{s.last30Days}</p>
-              <p class="text-xs text-slate-500 mt-0.5">30 derniers jours</p>
+              <p class="text-xs text-slate-500 mt-0.5">{t('stats.last30')}</p>
             </div>
           </div>
         </div>

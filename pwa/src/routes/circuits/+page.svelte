@@ -2,6 +2,7 @@
   import type { PageProps } from './$types';
   import { invalidateAll } from '$app/navigation';
   import { circuits as api } from '$lib/api';
+  import { t } from '$lib/i18n.svelte.js';
 
   let { data }: PageProps = $props();
 
@@ -44,15 +45,15 @@
       class="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white
              font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
     >
-      <span>+</span> Nouveau circuit
+      <span>+</span> {t('circuit.new')}
     </a>
   </div>
 
   {#if data.circuits.length === 0}
     <div class="text-center py-20 text-slate-500">
       <p class="text-4xl mb-3">🔄</p>
-      <p class="text-lg font-medium">Aucun circuit</p>
-      <p class="text-sm mt-1">Créez votre premier circuit d'entraînement.</p>
+      <p class="text-lg font-medium">{t('circuit.empty')}</p>
+      <p class="text-sm mt-1">{t('circuit.emptyDesc')}</p>
     </div>
   {:else}
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
