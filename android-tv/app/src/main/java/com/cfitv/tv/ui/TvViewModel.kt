@@ -3,7 +3,6 @@ package com.cfitv.tv.ui
 import android.app.Application
 import android.content.Context
 import android.net.nsd.NsdManager
-import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -142,37 +141,6 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     private val discoveryActive = AtomicBoolean(false)
     private val resolveInProgress = AtomicBoolean(false)
 
-    // Enregistrement mDNS de la TV (émission)
-    private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
-
-    private fun startMdnsRegistration(pin: String) {
-        stopMdnsRegistration()
-        val serviceInfo = NsdServiceInfo().apply {
-            serviceName = "cfitv-tv"
-            serviceType = "_cfitv-tv._tcp."
-            port        = 5353   // port symbolique (la TV n'écoute pas, c'est pour la découverte)
-            setAttribute("pin",   pin)
-            setAttribute("model", Build.MODEL)
-            setAttribute("os",    "Android ${Build.VERSION.RELEASE}")
-        }
-        nsdRegistrationListener = object : NsdManager.RegistrationListener {
-            override fun onRegistrationFailed(i: NsdServiceInfo, e: Int) {}
-            override fun onUnregistrationFailed(i: NsdServiceInfo, e: Int) {}
-            override fun onServiceRegistered(i: NsdServiceInfo) {}
-            override fun onServiceUnregistered(i: NsdServiceInfo) {}
-        }
-        try {
-            nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, nsdRegistrationListener!!)
-        } catch (_: Exception) { nsdRegistrationListener = null }
-    }
-
-    private fun stopMdnsRegistration() {
-        nsdRegistrationListener?.let {
-            try { nsdManager.unregisterService(it) } catch (_: Exception) {}
-        }
-        nsdRegistrationListener = null
-    }
-
     // ---- Internes ----
 
     private var wsClient: WsClient? = null
@@ -224,13 +192,11 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         // Sauvegarder au moins l'URL
         prefs.edit().putString("serverUrl", s.serverUrl).apply()
         _ui.update { it.copy(isPairing = true, pairingPin = pin, screen = UiState.Screen.DISPLAY) }
-        startMdnsRegistration(pin)
         createAndConnectPairing(s.serverUrl, pin)
     }
 
     /** Annuler le mode appairage → retour à l'écran de setup */
     fun cancelPairing() {
-        stopMdnsRegistration()
         wsClient?.close()
         wsClient = null
         reconnectJob?.cancel()
@@ -441,7 +407,6 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 is PairConfig -> {
                     // Config reçue de la console → sauvegarder et démarrer l'affichage
-                    stopMdnsRegistration()
                     val screenType = if (msg.screenType == "DASHBOARD") ScreenType.DASHBOARD else ScreenType.STATION
                     val newState = _ui.value.copy(
                         isPairing     = false,
@@ -560,7 +525,6 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         super.onCleared()
         stopMdnsDiscovery()
-        stopMdnsRegistration()
         wsClient?.close()
         reconnectJob?.cancel()
         heartbeatJob?.cancel()
