@@ -343,14 +343,12 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
             },
             onMessage      = { msg -> handleMessage(msg) },
             onDisconnected = {
-                // Si déconnecté pendant l'appairage → retour setup
-                viewModelScope.launch {
-                    _ui.update { it.copy(
-                        screen = UiState.Screen.SETUP,
-                        isPairing = false,
-                        pairingPin = "",
-                        connected = false,
-                    )}
+                // Garder le QR visible et reconnecter automatiquement
+                viewModelScope.launch { _ui.update { it.copy(connected = false) } }
+                reconnectJob?.cancel()
+                reconnectJob = viewModelScope.launch {
+                    delay(3_000)
+                    if (_ui.value.isPairing) createAndConnectPairing(serverUrl, pin)
                 }
             },
         )
