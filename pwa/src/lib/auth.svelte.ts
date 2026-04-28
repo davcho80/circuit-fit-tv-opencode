@@ -30,11 +30,11 @@ function createAuthStore() {
     user = null;
   }
 
-  async function hydrate(): Promise<void> {
+  async function hydrate(fetchFn?: typeof globalThis.fetch): Promise<void> {
     if (!token) return;
     loading = true;
     try {
-      user = await authApi.me();
+      user = await authApi.me(fetchFn);
     } catch {
       // Token expiré ou invalide
       persist(null);

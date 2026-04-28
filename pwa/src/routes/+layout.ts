@@ -11,29 +11,33 @@ import type { LayoutLoad } from './$types';
 // Routes accessibles sans authentification
 const PUBLIC_PREFIXES = ['/login', '/change-password', '/setup', '/tv'];
 
+const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+
 export const load: LayoutLoad = async ({ url, fetch }) => {
   const pathname = url.pathname;
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 
   // Vérifier si le setup initial est nécessaire (aucun utilisateur en base)
   try {
-    const status = await fetch('/setup/status').then((r) => r.json()) as { needsSetup: boolean };
-    if (status.needsSetup && pathname !== '/setup') {
-      throw redirect(302, '/setup');
-    }
-    // Si setup déjà fait et on essaie d'accéder à /setup → /login
-    if (!status.needsSetup && pathname === '/setup') {
-      throw redirect(302, '/login');
+    const res = await fetch(`${API_BASE}/setup/status`);
+    if (res.ok) {
+      const status = await res.json() as { needsSetup: boolean };
+      if (status.needsSetup && pathname !== '/setup') {
+        throw redirect(302, '/setup');
+      }
+      if (!status.needsSetup && pathname === '/setup') {
+        throw redirect(302, '/login');
+      }
     }
   } catch (e) {
     // Si c'est un redirect Svelte, le propager
     if (e && typeof e === 'object' && 'status' in e) throw e;
-    // Sinon ignorer (serveur inaccessible en dev au chargement initial)
+    // Sinon ignorer (serveur inaccessible)
   }
 
   // Hydrater le store si token présent mais user pas encore chargé
   if (authStore.token && !authStore.user) {
-    await authStore.hydrate();
+    await authStore.hydrate(fetch);
   }
 
   if (!authStore.token && !isPublic) {

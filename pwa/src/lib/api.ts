@@ -430,8 +430,8 @@ export const auth = {
     return request('POST', '/auth/login', { email, password });
   },
 
-  me(): Promise<UserPublic> {
-    return request('GET', '/auth/me');
+  me(fetchFn?: typeof globalThis.fetch): Promise<UserPublic> {
+    return request('GET', '/auth/me', undefined, fetchFn);
   },
 
   changePassword(currentPassword: string, newPassword: string): Promise<void> {

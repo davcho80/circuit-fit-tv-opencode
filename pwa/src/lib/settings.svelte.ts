@@ -16,11 +16,13 @@ const defaults: StudioSettings = {
   logoUrl:      null,
 };
 
+const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+
 let settings = $state<StudioSettings>({ ...defaults });
 
 export async function loadSettings(fetchFn: typeof globalThis.fetch = globalThis.fetch): Promise<void> {
   try {
-    const res = await fetchFn('/settings');
+    const res = await fetchFn(`${API_BASE}/settings`);
     if (res.ok) Object.assign(settings, await res.json() as StudioSettings);
   } catch { /* silently ignore */ }
 }

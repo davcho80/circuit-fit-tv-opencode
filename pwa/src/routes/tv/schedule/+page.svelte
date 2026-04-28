@@ -19,6 +19,8 @@
     classes:   ScheduledClass[];
   }
 
+  const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+
   // ---- State ----
   let days        = $state<ScheduledDay[]>([]);
   let loading     = $state(true);
@@ -31,7 +33,7 @@
   // ---- Fetch data ----
   async function fetchSchedule() {
     try {
-      const res = await fetch('/tv-schedule');
+      const res = await fetch(`${API_BASE}/tv-schedule`);
       if (res.ok) {
         days = await res.json() as ScheduledDay[];
         fetchError = false;
