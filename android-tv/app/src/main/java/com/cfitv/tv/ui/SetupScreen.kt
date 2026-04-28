@@ -15,11 +15,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // ============================================================
 // Écran de configuration — deux modes :
@@ -455,9 +458,11 @@ private fun PairingScreen(
     connected: Boolean,
     onCancel: () -> Unit,
 ) {
-    // Générer le QR code une seule fois par URL (remember sur la clé)
-    val qrBitmap = remember(pairingUrl) {
-        if (pairingUrl.isNotEmpty()) generateQrImageBitmap(pairingUrl, 512) else null
+    // Générer le QR code sur un thread de fond (512×512 setPixel bloque le main thread)
+    val qrBitmap: ImageBitmap? by produceState<ImageBitmap?>(null, pairingUrl) {
+        value = withContext(Dispatchers.Default) {
+            if (pairingUrl.isNotEmpty()) generateQrImageBitmap(pairingUrl, 512) else null
+        }
     }
 
     Box(
