@@ -9,29 +9,43 @@
   const DAY_LABELS = ['', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
   const DAY_FULL   = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
-  // Aperçu : 14 prochains jours
   const PREVIEW_DAYS = 14;
+
+  // ---- Types ----
+
+  interface TimeSlot { hour: number; minute: number }
+
+  interface BaseForm {
+    circuitId:  string;
+    name:       string;
+    daysOfWeek: number[];
+    timezone:   string;
+    startDate:  string;
+    endDate:    string | null;
+    isActive:   boolean;
+  }
 
   // ---- État formulaire ----
 
-  const EMPTY_FORM: ScheduleCreate = {
-    circuitId:  '',
-    name:       '',
-    daysOfWeek: [],
-    timeHour:   9,
-    timeMinute: 0,
-    timezone:   'America/Montreal',
-    startDate:  today(),
-    endDate:    null,
-    isActive:   true,
-  };
+  function emptyBase(): BaseForm {
+    return {
+      circuitId:  '',
+      name:       '',
+      daysOfWeek: [],
+      timezone:   'America/Montreal',
+      startDate:  today(),
+      endDate:    null,
+      isActive:   true,
+    };
+  }
 
-  let showForm    = $state(false);
-  let editId      = $state<string | null>(null);
-  let form        = $state<ScheduleCreate>({ ...EMPTY_FORM });
-  let saving      = $state(false);
-  let error       = $state<string | null>(null);
-  let deleteId    = $state<string | null>(null);
+  let showForm   = $state(false);
+  let editId     = $state<string | null>(null);   // null = création
+  let base       = $state<BaseForm>(emptyBase());
+  let timeSlots  = $state<TimeSlot[]>([{ hour: 9, minute: 0 }]);
+  let saving     = $state(false);
+  let error      = $state<string | null>(null);
+  let deleteId   = $state<string | null>(null);
 
   // ---- Helpers date ----
 
@@ -52,35 +66,36 @@
   // ---- Calendrier 14 jours ----
 
   interface CalendarEntry {
-    date:  string;        // YYYY-MM-DD
-    label: string;        // "Lun 26 avr"
+    date:  string;
+    label: string;
     items: Schedule[];
   }
 
   const calendar = $derived.by((): CalendarEntry[] => {
     const entries: CalendarEntry[] = [];
-    const base = new Date();
-    base.setHours(12, 0, 0, 0);
+    const now = new Date();
+    now.setHours(12, 0, 0, 0);
 
     for (let i = 0; i < PREVIEW_DAYS; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
 
-      const isoDate  = d.toISOString().slice(0, 10);
-      const jsDay    = d.getDay(); // 0=Sun
-      const isoDay   = jsDay === 0 ? 7 : jsDay;
-      const dayShort = DAY_LABELS[isoDay];
-      const dateStr  = d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' });
+      const isoDate = d.toISOString().slice(0, 10);
+      const jsDay   = d.getDay();
+      const isoDay  = jsDay === 0 ? 7 : jsDay;
+      const dateStr = d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' });
 
-      const items = data.schedules.filter((s) => {
-        if (!s.isActive) return false;
-        if (!s.daysOfWeek.includes(isoDay)) return false;
-        if (isoDate < s.startDate.slice(0, 10)) return false;
-        if (s.endDate && isoDate > s.endDate.slice(0, 10)) return false;
-        return true;
-      });
+      const items = data.schedules
+        .filter((s) => {
+          if (!s.isActive) return false;
+          if (!s.daysOfWeek.includes(isoDay)) return false;
+          if (isoDate < s.startDate.slice(0, 10)) return false;
+          if (s.endDate && isoDate > s.endDate.slice(0, 10)) return false;
+          return true;
+        })
+        .sort((a, b) => a.timeHour * 60 + a.timeMinute - (b.timeHour * 60 + b.timeMinute));
 
-      entries.push({ date: isoDate, label: `${dayShort} ${dateStr}`, items });
+      entries.push({ date: isoDate, label: `${DAY_LABELS[isoDay]} ${dateStr}`, items });
     }
 
     return entries;
@@ -89,39 +104,50 @@
   // ---- Toggle jour de la semaine ----
 
   function toggleDay(d: number) {
-    if (form.daysOfWeek.includes(d)) {
-      form.daysOfWeek = form.daysOfWeek.filter((x) => x !== d);
+    if (base.daysOfWeek.includes(d)) {
+      base.daysOfWeek = base.daysOfWeek.filter((x) => x !== d);
     } else {
-      form.daysOfWeek = [...form.daysOfWeek, d].sort((a, b) => a - b);
+      base.daysOfWeek = [...base.daysOfWeek, d].sort((a, b) => a - b);
     }
+  }
+
+  // ---- Gestion des tranches horaires ----
+
+  function addSlot() {
+    timeSlots = [...timeSlots, { hour: 9, minute: 0 }];
+  }
+
+  function removeSlot(i: number) {
+    if (timeSlots.length <= 1) return;
+    timeSlots = timeSlots.filter((_, idx) => idx !== i);
   }
 
   // ---- Ouvrir formulaire création ----
 
   function openCreate() {
-    editId   = null;
-    form     = { ...EMPTY_FORM, startDate: today() };
-    error    = null;
-    showForm = true;
+    editId    = null;
+    base      = emptyBase();
+    timeSlots = [{ hour: 9, minute: 0 }];
+    error     = null;
+    showForm  = true;
   }
 
   // ---- Ouvrir formulaire édition ----
 
   function openEdit(s: Schedule) {
     editId = s.id;
-    form   = {
+    base   = {
       circuitId:  s.circuitId,
       name:       s.name,
       daysOfWeek: [...s.daysOfWeek],
-      timeHour:   s.timeHour,
-      timeMinute: s.timeMinute,
       timezone:   s.timezone,
       startDate:  s.startDate.slice(0, 10),
       endDate:    s.endDate ? s.endDate.slice(0, 10) : null,
       isActive:   s.isActive,
     };
-    error    = null;
-    showForm = true;
+    timeSlots = [{ hour: s.timeHour, minute: s.timeMinute }];
+    error     = null;
+    showForm  = true;
   }
 
   // ---- Soumettre formulaire ----
@@ -129,22 +155,35 @@
   async function submit() {
     error = null;
 
-    if (!form.circuitId) { error = 'Choisir un circuit'; return; }
-    if (!form.name.trim()) { error = 'Nom requis'; return; }
-    if (form.daysOfWeek.length === 0) { error = 'Choisir au moins un jour'; return; }
-    if (!form.startDate) { error = 'Date de début requise'; return; }
+    if (!base.circuitId)          { error = 'Choisir un circuit'; return; }
+    if (!base.name.trim())        { error = 'Nom requis'; return; }
+    if (base.daysOfWeek.length === 0) { error = 'Choisir au moins un jour'; return; }
+    if (!base.startDate)          { error = 'Date de début requise'; return; }
+    if (timeSlots.length === 0)   { error = 'Ajouter au moins une heure'; return; }
 
     saving = true;
     try {
-      const payload: ScheduleCreate = {
-        ...form,
-        endDate: form.endDate || null,
-      };
-
       if (editId) {
+        // Édition : mise à jour de l'entrée existante (première heure)
+        const slot = timeSlots[0]!;
+        const payload: ScheduleCreate = {
+          ...base,
+          timeHour:   slot.hour,
+          timeMinute: slot.minute,
+          endDate:    base.endDate || null,
+        };
         await api.update(editId, payload);
       } else {
-        await api.create(payload);
+        // Création : une entrée par tranche horaire
+        for (const slot of timeSlots) {
+          const payload: ScheduleCreate = {
+            ...base,
+            timeHour:   slot.hour,
+            timeMinute: slot.minute,
+            endDate:    base.endDate || null,
+          };
+          await api.create(payload);
+        }
       }
 
       showForm = false;
@@ -165,7 +204,7 @@
       deleteId = null;
       await invalidateAll();
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Erreur suppression';
+      error    = e instanceof Error ? e.message : 'Erreur suppression';
       deleteId = null;
     }
   }
@@ -296,32 +335,33 @@
      ============================================================ -->
 
 {#if showForm}
-  <!-- Overlay -->
   <div
     class="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 flex items-center justify-center p-4"
     role="presentation"
     onclick={(e) => { if (e.target === e.currentTarget) showForm = false; }}
   >
     <div
-      class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl z-50"
+      class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl z-50 max-h-[90vh] flex flex-col"
       role="dialog"
       aria-modal="true"
       aria-label={editId ? 'Modifier la cédule' : 'Nouvelle cédule'}
     >
-      <div class="px-6 pt-6 pb-4 border-b border-slate-800 flex items-center justify-between">
+      <!-- En-tête -->
+      <div class="px-6 pt-6 pb-4 border-b border-slate-800 flex items-center justify-between shrink-0">
         <h2 class="text-lg font-semibold text-slate-100">
           {editId ? 'Modifier la cédule' : 'Nouvelle cédule'}
         </h2>
         <button onclick={() => { showForm = false; }} class="text-slate-400 hover:text-slate-100 text-xl leading-none">×</button>
       </div>
 
-      <div class="px-6 py-5 space-y-5">
+      <!-- Corps scrollable -->
+      <div class="px-6 py-5 space-y-5 overflow-y-auto flex-1">
 
         <!-- Nom -->
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1.5">Nom</label>
           <input
-            bind:value={form.name}
+            bind:value={base.name}
             type="text"
             placeholder="ex: Lundi cardio"
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
@@ -332,7 +372,7 @@
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1.5">Circuit</label>
           <select
-            bind:value={form.circuitId}
+            bind:value={base.circuitId}
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
           >
             <option value="">-- Choisir un circuit --</option>
@@ -347,7 +387,7 @@
           <label class="block text-sm font-medium text-slate-300 mb-2">Jours</label>
           <div class="flex gap-2 flex-wrap">
             {#each [1,2,3,4,5,6,7] as d}
-              {@const active = form.daysOfWeek.includes(d)}
+              {@const active = base.daysOfWeek.includes(d)}
               <button
                 type="button"
                 onclick={() => toggleDay(d)}
@@ -362,33 +402,74 @@
           </div>
         </div>
 
-        <!-- Heure -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-slate-300 mb-1.5">Heure</label>
-            <input
-              type="number"
-              min="0" max="23"
-              bind:value={form.timeHour}
-              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
-            />
+        <!-- Heures -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-medium text-slate-300">
+              Heures
+              {#if !editId}
+                <span class="text-slate-500 font-normal text-xs ml-1">
+                  — {timeSlots.length > 1 ? `${timeSlots.length} sessions créées` : '1 session créée'}
+                </span>
+              {/if}
+            </label>
+            {#if !editId}
+              <button
+                type="button"
+                onclick={addSlot}
+                class="text-xs bg-slate-800 hover:bg-sky-700/40 text-slate-300 hover:text-sky-200
+                       px-2.5 py-1 rounded-lg transition-colors border border-slate-700"
+              >
+                + Ajouter une heure
+              </button>
+            {/if}
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-300 mb-1.5">Minute</label>
-            <input
-              type="number"
-              min="0" max="59"
-              bind:value={form.timeMinute}
-              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
-            />
+
+          <div class="space-y-2">
+            {#each timeSlots as slot, i}
+              <div class="flex items-center gap-3 bg-slate-800/60 rounded-lg px-3 py-2.5 border border-slate-700/50">
+                <span class="text-slate-500 text-xs w-4 shrink-0 text-center font-mono">{i + 1}</span>
+                <div class="flex items-center gap-2 flex-1">
+                  <input
+                    type="number"
+                    min="0" max="23"
+                    bind:value={slot.hour}
+                    class="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-sky-600"
+                  />
+                  <span class="text-slate-400 font-bold">:</span>
+                  <input
+                    type="number"
+                    min="0" max="59"
+                    bind:value={slot.minute}
+                    class="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-sky-600"
+                  />
+                  <span class="text-slate-500 text-xs tabular-nums">
+                    {pad(slot.hour)}:{pad(slot.minute)}
+                  </span>
+                </div>
+                {#if !editId && timeSlots.length > 1}
+                  <button
+                    type="button"
+                    onclick={() => removeSlot(i)}
+                    class="text-slate-600 hover:text-red-400 transition-colors text-sm shrink-0 px-1"
+                  >✕</button>
+                {/if}
+              </div>
+            {/each}
           </div>
+
+          {#if !editId && timeSlots.length > 1}
+            <p class="text-xs text-slate-500 mt-2">
+              💡 {timeSlots.length} cédules seront créées — une par heure ci-dessus.
+            </p>
+          {/if}
         </div>
 
         <!-- Timezone -->
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1.5">Fuseau horaire</label>
           <select
-            bind:value={form.timezone}
+            bind:value={base.timezone}
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
           >
             <option value="America/Montreal">America/Montreal (EST/EDT)</option>
@@ -409,15 +490,17 @@
             <label class="block text-sm font-medium text-slate-300 mb-1.5">Date de début</label>
             <input
               type="date"
-              bind:value={form.startDate}
+              bind:value={base.startDate}
               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-1.5">Date de fin <span class="text-slate-500 font-normal">(optionnel)</span></label>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">
+              Date de fin <span class="text-slate-500 font-normal">(optionnel)</span>
+            </label>
             <input
               type="date"
-              bind:value={form.endDate}
+              bind:value={base.endDate}
               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
             />
           </div>
@@ -427,7 +510,7 @@
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
-            bind:checked={form.isActive}
+            bind:checked={base.isActive}
             class="w-4 h-4 accent-sky-500"
           />
           <span class="text-sm text-slate-300">Cédule active</span>
@@ -442,7 +525,7 @@
       </div>
 
       <!-- Boutons -->
-      <div class="px-6 py-4 border-t border-slate-800 flex justify-end gap-3">
+      <div class="px-6 py-4 border-t border-slate-800 flex justify-end gap-3 shrink-0">
         <button
           onclick={() => { showForm = false; }}
           class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors"
@@ -454,7 +537,15 @@
           disabled={saving}
           class="px-5 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg transition-colors"
         >
-          {saving ? 'Enregistrement…' : (editId ? 'Enregistrer' : 'Créer')}
+          {#if saving}
+            Enregistrement…
+          {:else if editId}
+            Enregistrer
+          {:else if timeSlots.length > 1}
+            Créer {timeSlots.length} cédules
+          {:else}
+            Créer
+          {/if}
         </button>
       </div>
     </div>
