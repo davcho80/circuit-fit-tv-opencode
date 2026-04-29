@@ -145,6 +145,9 @@ export const ScheduledBreak = z.object({
 });
 export type ScheduledBreak = z.infer<typeof ScheduledBreak>;
 
+export const StationMode = z.enum(['TIME', 'REPS']);
+export type StationMode = z.infer<typeof StationMode>;
+
 export const CircuitCreate = Circuit.omit({
   id: true,
   icon: true,
@@ -157,9 +160,13 @@ export const CircuitCreate = Circuit.omit({
   stations: z
     .array(
       CircuitStation.omit({ id: true, circuitId: true, position: true }).extend({
-        position: z.number().int().min(1),
-        layoutX: z.number().min(0).max(1).nullable().optional(),
-        layoutY: z.number().min(0).max(1).nullable().optional(),
+        position:          z.number().int().min(1),
+        layoutX:           z.number().min(0).max(1).nullable().optional(),
+        layoutY:           z.number().min(0).max(1).nullable().optional(),
+        stationMode:       StationMode.optional(),
+        sets:              z.number().int().min(1).max(20).nullable().optional(),
+        reps:              z.number().int().min(1).max(200).nullable().optional(),
+        restBetweenSetsSec: z.number().int().min(0).max(600).nullable().optional(),
       }),
     )
     .min(2)

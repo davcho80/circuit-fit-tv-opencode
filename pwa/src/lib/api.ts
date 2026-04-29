@@ -136,6 +136,10 @@ export interface CircuitStationData {
   position: number;
   layoutX: number | null;
   layoutY: number | null;
+  stationMode: 'TIME' | 'REPS';
+  sets: number | null;
+  reps: number | null;
+  restBetweenSetsSec: number | null;
   exercises: Array<{ exercise: Exercise }>;
 }
 
@@ -173,6 +177,10 @@ export interface CircuitStationInput {
   exerciseIds: string[];
   layoutX?: number | null;
   layoutY?: number | null;
+  stationMode?: 'TIME' | 'REPS';
+  sets?: number | null;
+  reps?: number | null;
+  restBetweenSetsSec?: number | null;
 }
 
 export interface CircuitCreate {

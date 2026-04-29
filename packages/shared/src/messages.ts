@@ -132,6 +132,11 @@ export const SessionUpdateMsg = z.object({
         type: PhaseType,
         label: z.string(),
         durationMs: z.number().int(),
+        // Champs supplémentaires pour le mode REPS
+        setNumber:  z.number().int().optional(),
+        totalSets:  z.number().int().optional(),
+        reps:       z.number().int().optional(),
+        isRepsMode: z.boolean().optional(),
       }),
       phaseStartsAt: z.number().int(),
       phaseEndsAt: z.number().int(),

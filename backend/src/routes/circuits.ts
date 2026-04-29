@@ -54,9 +54,13 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
         icon: icon ?? null,
         stations: {
           create: stations.map((s) => ({
-            position: s.position,
-            layoutX: s.layoutX ?? null,
-            layoutY: s.layoutY ?? null,
+            position:           s.position,
+            layoutX:            s.layoutX ?? null,
+            layoutY:            s.layoutY ?? null,
+            stationMode:        (s.stationMode ?? 'TIME') as 'TIME' | 'REPS',
+            sets:               s.sets ?? null,
+            reps:               s.reps ?? null,
+            restBetweenSetsSec: s.restBetweenSetsSec ?? null,
             exercises: {
               create: s.exerciseIds.map((exerciseId) => ({ exerciseId })),
             },
@@ -132,10 +136,14 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
 
     const StationsBody = z.object({
       stations: z.array(z.object({
-        position:    z.number().int().min(1),
-        exerciseIds: z.array(z.string().uuid()).min(1),
-        layoutX:     z.number().nullable().optional(),
-        layoutY:     z.number().nullable().optional(),
+        position:          z.number().int().min(1),
+        exerciseIds:       z.array(z.string().uuid()).min(1),
+        layoutX:           z.number().nullable().optional(),
+        layoutY:           z.number().nullable().optional(),
+        stationMode:       z.enum(['TIME', 'REPS']).optional(),
+        sets:              z.number().int().min(1).max(20).nullable().optional(),
+        reps:              z.number().int().min(1).max(200).nullable().optional(),
+        restBetweenSetsSec: z.number().int().min(0).max(600).nullable().optional(),
       })).min(2),
     });
     const body = StationsBody.safeParse(req.body);
@@ -148,10 +156,14 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
       for (const s of body.data.stations) {
         await tx.circuitStation.create({
           data: {
-            circuitId: req.params.id,
-            position:  s.position,
-            layoutX:   s.layoutX ?? null,
-            layoutY:   s.layoutY ?? null,
+            circuitId:          req.params.id,
+            position:           s.position,
+            layoutX:            s.layoutX ?? null,
+            layoutY:            s.layoutY ?? null,
+            stationMode:        (s.stationMode ?? 'TIME') as 'TIME' | 'REPS',
+            sets:               s.sets ?? null,
+            reps:               s.reps ?? null,
+            restBetweenSetsSec: s.restBetweenSetsSec ?? null,
             exercises: {
               create: s.exerciseIds.map((exerciseId) => ({ exerciseId })),
             },

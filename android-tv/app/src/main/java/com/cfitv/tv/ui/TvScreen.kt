@@ -271,6 +271,9 @@ private fun LandscapeLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            val phase = uiState.session?.phase
+            val isRepsWork = phase?.isRepsMode == true && phase.type == "WORK"
+
             Text(
                 text = cfg.label,
                 fontSize = 13.sp,
@@ -279,20 +282,42 @@ private fun LandscapeLayout(
                 color = animAcc.copy(alpha = 0.6f),
             )
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = fmtSec(uiState.remainingSec),
-                fontSize = if (uiState.remainingSec >= 60) 70.sp else 100.sp,
-                fontWeight = FontWeight.Black,
-                color = animAcc,
-                lineHeight = 1.sp,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = if (uiState.remainingSec >= 60) "" else "sec",
-                fontSize = 16.sp,
-                letterSpacing = 4.sp,
-                color = Color.White.copy(alpha = 0.35f),
-            )
+
+            if (isRepsWork && phase != null) {
+                // Mode REPS — afficher Set X/Y
+                Text(
+                    text = "Set ${phase.setNumber}/${phase.totalSets}",
+                    fontSize = 52.sp,
+                    fontWeight = FontWeight.Black,
+                    color = animAcc,
+                    lineHeight = 1.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "${phase.reps} reps",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                // Mode TIME ou REST — minuterie normale
+                Text(
+                    text = fmtSec(uiState.remainingSec),
+                    fontSize = if (uiState.remainingSec >= 60) 70.sp else 100.sp,
+                    fontWeight = FontWeight.Black,
+                    color = animAcc,
+                    lineHeight = 1.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (uiState.remainingSec >= 60) "" else "sec",
+                    fontSize = 16.sp,
+                    letterSpacing = 4.sp,
+                    color = Color.White.copy(alpha = 0.35f),
+                )
+            }
             if (uiState.session?.status == "PAUSED") {
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -340,6 +365,8 @@ private fun PortraitLayout(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Timer compact en haut
+        val phaseP = uiState.session?.phase
+        val isRepsWorkP = phaseP?.isRepsMode == true && phaseP.type == "WORK"
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -355,13 +382,29 @@ private fun PortraitLayout(
                 color = animAcc.copy(alpha = 0.7f),
             )
             Spacer(Modifier.width(24.dp))
-            Text(
-                text = fmtSec(uiState.remainingSec),
-                fontSize = 56.sp,
-                fontWeight = FontWeight.Black,
-                color = animAcc,
-                lineHeight = 1.sp,
-            )
+            if (isRepsWorkP && phaseP != null) {
+                Text(
+                    text = "Set ${phaseP.setNumber}/${phaseP.totalSets}",
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.Black,
+                    color = animAcc,
+                    lineHeight = 1.sp,
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "${phaseP.reps} reps",
+                    fontSize = 22.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                )
+            } else {
+                Text(
+                    text = fmtSec(uiState.remainingSec),
+                    fontSize = 56.sp,
+                    fontWeight = FontWeight.Black,
+                    color = animAcc,
+                    lineHeight = 1.sp,
+                )
+            }
             if (uiState.session?.status == "PAUSED") {
                 Spacer(Modifier.width(12.dp))
                 Text(

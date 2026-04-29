@@ -52,6 +52,11 @@ enum PhaseType {
   HYDRATION
 }
 
+enum StationMode {
+  TIME
+  REPS
+}
+
 // ----- Exercise -----
 
 model Exercise {
@@ -124,12 +129,16 @@ model ScheduledBreak {
 }
 
 model CircuitStation {
-  id        String  @id @default(uuid())
-  circuit   Circuit @relation(fields: [circuitId], references: [id], onDelete: Cascade)
-  circuitId String
-  position  Int
-  layoutX   Float?
-  layoutY   Float?
+  id                 String      @id @default(uuid())
+  circuit            Circuit     @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  circuitId          String
+  position           Int
+  layoutX            Float?
+  layoutY            Float?
+  stationMode        StationMode @default(TIME)
+  sets               Int?        // REPS : nombre de sets
+  reps               Int?        // REPS : répétitions par set
+  restBetweenSetsSec Int?        // REPS : repos entre les sets (secondes)
 
   exercises CircuitStationExercise[]
 

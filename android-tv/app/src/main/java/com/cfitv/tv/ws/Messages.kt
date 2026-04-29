@@ -86,6 +86,9 @@ data class StationResponse(
     val id: String,
     val position: Int,
     val exercises: List<StationExerciseEntry>,
+    val stationMode: String = "TIME",
+    val sets: Int? = null,
+    val reps: Int? = null,
 )
 
 @Serializable
@@ -107,6 +110,10 @@ data class PhaseInfo(
     val type: String,             // "WORK" | "REST" | "TRANSITION"
     val label: String,
     val durationMs: Long,
+    val setNumber:  Int?     = null,
+    val totalSets:  Int?     = null,
+    val reps:       Int?     = null,
+    val isRepsMode: Boolean? = null,
 )
 
 // ---- Serveur → Client (suite) ----

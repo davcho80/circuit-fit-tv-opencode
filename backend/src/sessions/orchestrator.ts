@@ -17,6 +17,11 @@ interface Phase {
   durationMs: number;
   stationIdx: number; // index dans circuit.stations
   round: number;
+  // Mode REPS
+  setNumber?:  number;
+  totalSets?:  number;
+  reps?:       number;
+  isRepsMode?: boolean;
 }
 
 interface ActiveSession {
@@ -206,7 +211,7 @@ class SessionOrchestrator {
         round: phase.round,
         totalRounds: this.active.totalRounds,
         stationIdx: phase.stationIdx,
-        phase: { type: phase.type, label: phase.label, durationMs: phase.durationMs },
+        phase: { type: phase.type, label: phase.label, durationMs: phase.durationMs, setNumber: phase.setNumber, totalSets: phase.totalSets, reps: phase.reps, isRepsMode: phase.isRepsMode },
         phaseStartsAt: this.active.phaseStartsAt,
         phaseEndsAt: this.active.phaseEndsAt,
         pausedAt: this.active.pausedAt,
@@ -290,9 +295,13 @@ class SessionOrchestrator {
         totalRounds: this.active.totalRounds,
         stationIdx: phase.stationIdx,
         phase: {
-          type: phase.type,
-          label: phase.label,
+          type:       phase.type,
+          label:      phase.label,
           durationMs: phase.durationMs,
+          setNumber:  phase.setNumber,
+          totalSets:  phase.totalSets,
+          reps:       phase.reps,
+          isRepsMode: phase.isRepsMode,
         },
         phaseStartsAt: this.active.phaseStartsAt,
         phaseEndsAt: this.active.phaseEndsAt,
@@ -310,7 +319,11 @@ type CircuitWithStations = Awaited<
   ReturnType<typeof prisma.circuit.findUniqueOrThrow>
 > & {
   stations: Array<{
-    position: number;
+    position:          number;
+    stationMode:       string;
+    sets:              number | null;
+    reps:              number | null;
+    restBetweenSetsSec: number | null;
     exercises: Array<{ exercise: { name: string } }>;
   }>;
   scheduledBreaks: Array<{ afterRound: number; durationSec: number; label: string }>;
@@ -342,25 +355,62 @@ function buildPhases(circuit: CircuitWithStations): Phase[] {
         });
       }
 
-      // Phase de travail
-      phases.push({
-        type: 'WORK',
-        label: exerciseNames || `Station ${station.position}`,
-        durationMs: circuit.workSec * 1000,
-        stationIdx: si,
-        round,
-      });
+      if (station.stationMode === 'REPS') {
+        // ── Mode REPS : sets × (WORK manuel + REST auto) ──────────
+        const totalSets = station.sets  ?? 3;
+        const reps      = station.reps  ?? 10;
+        const restMs    = (station.restBetweenSetsSec ?? 60) * 1000;
 
-      // Repos après travail (sauf après la dernière station du dernier round)
-      const isLast = round === circuit.rounds && si === stationCount - 1;
-      if (circuit.restSec > 0 && !isLast) {
+        for (let setNum = 1; setNum <= totalSets; setNum++) {
+          // WORK : pas de minuterie (1 h = avancement manuel par le coach)
+          phases.push({
+            type:       'WORK',
+            label:      `Set ${setNum}/${totalSets} — ${reps} reps`,
+            durationMs: 3_600_000,
+            stationIdx: si,
+            round,
+            setNumber:  setNum,
+            totalSets,
+            reps,
+            isRepsMode: true,
+          });
+
+          // REST entre chaque set (pas après le dernier)
+          if (setNum < totalSets) {
+            phases.push({
+              type:       'REST',
+              label:      'Repos',
+              durationMs: restMs,
+              stationIdx: si,
+              round,
+              setNumber:  setNum,
+              totalSets,
+              reps,
+              isRepsMode: true,
+            });
+          }
+        }
+      } else {
+        // ── Mode TIME : comportement existant ─────────────────────
         phases.push({
-          type: 'REST',
-          label: 'Repos',
-          durationMs: circuit.restSec * 1000,
+          type:      'WORK',
+          label:     exerciseNames || `Station ${station.position}`,
+          durationMs: circuit.workSec * 1000,
           stationIdx: si,
           round,
         });
+
+        // Repos après travail (sauf après la dernière station du dernier round)
+        const isLast = round === circuit.rounds && si === stationCount - 1;
+        if (circuit.restSec > 0 && !isLast) {
+          phases.push({
+            type:      'REST',
+            label:     'Repos',
+            durationMs: circuit.restSec * 1000,
+            stationIdx: si,
+            round,
+          });
+        }
       }
     }
 
