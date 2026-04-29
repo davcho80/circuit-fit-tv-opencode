@@ -129,9 +129,10 @@ data class PhaseInfo(
 
 @Serializable @SerialName("PAIR_CONFIG")
 data class PairConfig(
+    val displayId: String,
     val label: String,
     val stationNumber: Int,
-    val screenType: String,       // "STATION" | "DASHBOARD"
+    val screenType: String,       // "STATION" | "DASHBOARD" | "CENTRAL"
     val isLandscape: Boolean,
     val primaryColor: String? = null,
     val logoUrl: String? = null,

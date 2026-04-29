@@ -8,7 +8,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { hub } from '../ws/hub.js';
-import { claimPin, getPendingPairs } from '../ws/pair.js';
+import { claimPinWithInfo, getPendingPairs } from '../ws/pair.js';
 import { prisma } from '../db.js';
 import { requireAuth } from '../auth/jwt.plugin.js';
 
@@ -16,7 +16,7 @@ const PairClaimBody = z.object({
   pin:           z.string().length(4).regex(/^\d{4}$/),
   label:         z.string().min(1).max(50),
   stationNumber: z.number().int().min(1).max(20),
-  screenType:    z.enum(['STATION', 'DASHBOARD']),
+  screenType:    z.enum(['STATION', 'DASHBOARD', 'CENTRAL']),
   isLandscape:   z.boolean(),
 });
 
@@ -35,16 +35,35 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: body.error.flatten() });
     }
 
-    const client = claimPin(body.data.pin);
-    if (!client) {
+    const entry = claimPinWithInfo(body.data.pin);
+    if (!entry) {
       return reply.code(404).send({ error: 'Code invalide ou expiré. Vérifiez que la TV affiche bien ce code.' });
     }
+
+    const { client, deviceModel, deviceOs, appVersion } = entry;
+
+    // Créer l'enregistrement Display en DB
+    const role = body.data.screenType === 'STATION' ? 'STATION' : 'CENTRAL';
+
+    const display = await prisma.display.create({
+      data: {
+        name:          body.data.label,
+        role,
+        stationNumber: body.data.screenType === 'STATION' ? body.data.stationNumber : null,
+        deviceModel:   deviceModel ?? null,
+        deviceOs:      deviceOs    ?? null,
+        appVersion:    appVersion  ?? null,
+        pairedAt:      new Date(),
+        lastSeen:      new Date(),
+      },
+    });
 
     // Récupérer le branding studio pour l'envoyer à la TV
     const studio = await prisma.studioSettings.findUnique({ where: { id: 'singleton' } });
 
     hub.send(client, {
       type:          'PAIR_CONFIG',
+      displayId:     display.id,
       label:         body.data.label,
       stationNumber: body.data.stationNumber,
       screenType:    body.data.screenType,
@@ -52,6 +71,9 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
       primaryColor:  studio?.primaryColor ?? '#0ea5e9',
       logoUrl:       studio?.logoUrl ?? null,
     });
+
+    // Mettre à jour le displayId dans le hub pour que la TV soit visible immédiatement
+    hub.setDisplayId(client.id, display.id);
 
     return { ok: true, clientId: client.id, label: client.label };
   });

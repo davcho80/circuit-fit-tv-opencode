@@ -37,6 +37,11 @@ class WsHub {
     this.clients.delete(id);
   }
 
+  setDisplayId(clientId: string, displayId: string): void {
+    const client = this.clients.get(clientId);
+    if (client) client.displayId = displayId;
+  }
+
   get(id: string): ConnectedClient | undefined {
     return this.clients.get(id);
   }

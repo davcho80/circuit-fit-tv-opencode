@@ -218,12 +218,13 @@ export const ErrorMsg = z.object({
 // Serveur → TV : config poussée après validation du PIN par l'admin
 export const PairConfigMsg = z.object({
   type:         z.literal('PAIR_CONFIG'),
+  displayId:    z.string().uuid(),
   label:        z.string().min(1).max(50),
   stationNumber: z.number().int().min(1).max(20),
-  screenType:   z.enum(['STATION', 'DASHBOARD']),
+  screenType:   z.enum(['STATION', 'DASHBOARD', 'CENTRAL']),
   isLandscape:  z.boolean(),
-  primaryColor: z.string().optional(),   // couleur principale du studio
-  logoUrl:      z.string().nullable().optional(),  // URL du logo studio
+  primaryColor: z.string().optional(),
+  logoUrl:      z.string().nullable().optional(),
 });
 
 export const ServerMessage = z.discriminatedUnion('type', [

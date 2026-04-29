@@ -50,6 +50,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val connected: Boolean        = false,
         val primaryColor: String      = "#0ea5e9",
         val logoUrl: String?          = null,
+        val displayId: String?        = null,
         val session: SessionPayload?  = null,
         val circuit: CircuitResponse? = null,
         val isMyWork: Boolean         = false,
@@ -77,19 +78,19 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("cfitv_config", Context.MODE_PRIVATE)
 
     private fun loadSavedConfig(): UiState {
-        val url    = prefs.getString("serverUrl", null)
-        val label  = prefs.getString("label", null)
+        val url     = prefs.getString("serverUrl", null)
+        val label   = prefs.getString("label", null)
         val station = prefs.getInt("stationNumber", 0)
-        val land   = prefs.getBoolean("isLandscape", true)
-        val type   = prefs.getString("screenType", null)
+        val land    = prefs.getBoolean("isLandscape", true)
+        val type    = prefs.getString("screenType", null)
 
-        // URL sauvegardée pour pré-remplir le champ même sans config complète
         val savedUrl = url ?: "ws://192.168.1.1:3000/ws"
 
         if (url != null && label != null && station > 0 && type != null) {
             val screenType   = try { ScreenType.valueOf(type) } catch (_: Exception) { ScreenType.STATION }
             val primaryColor = prefs.getString("primaryColor", "#0ea5e9") ?: "#0ea5e9"
             val logoUrl      = prefs.getString("logoUrl", null)
+            val displayId    = prefs.getString("displayId", null)
             return UiState(
                 screen        = UiState.Screen.DISPLAY,
                 screenType    = screenType,
@@ -99,13 +100,14 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 isLandscape   = land,
                 primaryColor  = primaryColor,
                 logoUrl       = logoUrl,
+                displayId     = displayId,
             )
         }
         return UiState(serverUrl = savedUrl)
     }
 
     private fun saveConfig(s: UiState) {
-        prefs.edit()
+        val edit = prefs.edit()
             .putString("serverUrl", s.serverUrl)
             .putString("label", s.label)
             .putInt("stationNumber", s.stationNumber)
@@ -113,13 +115,16 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
             .putString("screenType", s.screenType.name)
             .putString("primaryColor", s.primaryColor)
             .putString("logoUrl", s.logoUrl)
-            .apply()
+        if (s.displayId != null) edit.putString("displayId", s.displayId)
+        else edit.remove("displayId")
+        edit.apply()
     }
 
     private fun clearConfig() {
         prefs.edit()
             .remove("label").remove("stationNumber")
             .remove("isLandscape").remove("screenType")
+            .remove("displayId")
             .apply()
         // On garde serverUrl pour pré-remplir la prochaine fois
     }
@@ -161,7 +166,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val s = _ui.value
         if (s.screen == UiState.Screen.DISPLAY) {
             // Config complète sauvegardée → connexion directe, sans interaction
-            createAndConnect(s.serverUrl, s.label)
+            createAndConnect(s.serverUrl, s.label, s.displayId)
             startTimerTick()
             if (s.screenType == ScreenType.SCHEDULE) startScheduleRefresh()
         } else {
@@ -185,7 +190,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val s = _ui.value
         saveConfig(s)
         _ui.update { it.copy(screen = UiState.Screen.DISPLAY, isPairing = false) }
-        createAndConnect(s.serverUrl, s.label)
+        createAndConnect(s.serverUrl, s.label, s.displayId)
         startTimerTick()
         if (s.screenType == ScreenType.SCHEDULE) startScheduleRefresh()
     }
@@ -312,14 +317,15 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Connexion WS ----
 
-    private fun createAndConnect(serverUrl: String, label: String) {
+    private fun createAndConnect(serverUrl: String, label: String, displayId: String? = null) {
         wsClient?.close()
         wsClient = WsClient(
             serverUrl      = serverUrl,
             label          = label,
+            displayId      = displayId,
             onConnected    = { handleConnected() },
             onMessage      = { msg -> handleMessage(msg) },
-            onDisconnected = { handleDisconnected(serverUrl, label) },
+            onDisconnected = { handleDisconnected(serverUrl, label, displayId) },
         )
         wsClient!!.connect()
     }
@@ -412,14 +418,15 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 is PairConfig -> {
                     // Config reçue de la console → sauvegarder et démarrer l'affichage
                     val screenType = when (msg.screenType) {
-                        "DASHBOARD" -> ScreenType.DASHBOARD
-                        "SCHEDULE"  -> ScreenType.SCHEDULE
-                        else        -> ScreenType.STATION
+                        "DASHBOARD", "CENTRAL" -> ScreenType.DASHBOARD
+                        "SCHEDULE"             -> ScreenType.SCHEDULE
+                        else                   -> ScreenType.STATION
                     }
                     val newState = _ui.value.copy(
                         screen        = UiState.Screen.DISPLAY,
                         isPairing     = false,
                         pairingPin    = "",
+                        displayId     = msg.displayId,
                         label         = msg.label,
                         stationNumber = msg.stationNumber,
                         isLandscape   = msg.isLandscape,
@@ -431,12 +438,13 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                     _ui.update { newState }
                     startTimerTick()
                     if (screenType == ScreenType.SCHEDULE) startScheduleRefresh()
-                    // Reconnexion avec le bon label
+                    // Reconnexion avec le bon label et displayId
                     val url = newState.serverUrl
                     val lbl = newState.label
+                    val did = newState.displayId
                     viewModelScope.launch {
-                        delay(500) // laisser le temps à la WS de se stabiliser
-                        createAndConnect(url, lbl)
+                        delay(500)
+                        createAndConnect(url, lbl, did)
                     }
                 }
                 else -> { /* ignoré */ }
@@ -490,7 +498,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Reconnexion ----
 
-    private fun handleDisconnected(serverUrl: String, label: String) {
+    private fun handleDisconnected(serverUrl: String, label: String, displayId: String? = null) {
         clockJob?.cancel()
         heartbeatJob?.cancel()
         viewModelScope.launch { _ui.update { it.copy(connected = false) } }
@@ -498,7 +506,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         reconnectJob?.cancel()
         reconnectJob = viewModelScope.launch {
             delay(3_000)
-            createAndConnect(serverUrl, label)
+            createAndConnect(serverUrl, label, displayId)
         }
     }
 

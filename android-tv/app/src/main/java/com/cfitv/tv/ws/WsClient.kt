@@ -16,6 +16,7 @@ import java.time.Duration
 class WsClient(
     private val serverUrl: String,
     private val label: String,
+    private val displayId: String? = null,
     private val onConnected: () -> Unit,
     private val onMessage: (ServerMessage) -> Unit,
     private val onDisconnected: () -> Unit,
@@ -39,7 +40,7 @@ class WsClient(
                 // REGISTER immédiat après connexion
                 webSocket.send(
                     json.encodeToString<ClientMessage>(
-                        ClientMessage.Register(role = "tv", label = label)
+                        ClientMessage.Register(role = "tv", label = label, displayId = displayId)
                     )
                 )
                 onConnected()

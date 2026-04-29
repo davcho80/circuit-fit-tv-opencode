@@ -5,7 +5,7 @@
 
 import type { ConnectedClient } from './hub.js';
 
-interface PendingEntry {
+export interface PendingEntry {
   client:       ConnectedClient;
   deviceModel?: string;
   deviceOs?:    string;
@@ -39,6 +39,14 @@ export function claimPin(pin: string): ConnectedClient | undefined {
   const entry = registry.get(pin);
   if (entry) registry.delete(pin);
   return entry?.client;
+}
+
+/** Variante enrichie : retourne le client + les infos device */
+export function claimPinWithInfo(pin: string): (PendingEntry & { client: ConnectedClient }) | undefined {
+  const entry = registry.get(pin);
+  if (!entry) return undefined;
+  registry.delete(pin);
+  return entry;
 }
 
 /** Nettoyage quand une TV se déconnecte pendant l'appairage */
