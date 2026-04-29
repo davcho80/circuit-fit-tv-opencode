@@ -40,7 +40,29 @@ export default defineConfig({
     // Écoute sur toutes les interfaces pour que le téléphone/TV puisse accéder
     // au dev server depuis le réseau local (nécessaire pour tester le flux QR).
     host: true,
+    // Proxy : toutes les routes API/WS sont redirigées vers le backend Fastify.
+    // Permet aux appareils externes (téléphone, tablette) d'appeler l'API via
+    // l'IP du Mac sur le port Vite (5173) sans avoir à connaître le port backend.
+    proxy: {
+      '/auth':       { target: 'http://localhost:3000', changeOrigin: true },
+      '/exercises':  { target: 'http://localhost:3000', changeOrigin: true },
+      '/circuits':   { target: 'http://localhost:3000', changeOrigin: true },
+      '/displays':   { target: 'http://localhost:3000', changeOrigin: true },
+      '/sessions':   { target: 'http://localhost:3000', changeOrigin: true },
+      '/schedules':  { target: 'http://localhost:3000', changeOrigin: true },
+      '/stats':      { target: 'http://localhost:3000', changeOrigin: true },
+      '/users':      { target: 'http://localhost:3000', changeOrigin: true },
+      '/settings':   { target: 'http://localhost:3000', changeOrigin: true },
+      '/update':     { target: 'http://localhost:3000', changeOrigin: true },
+      '/pair':       { target: 'http://localhost:3000', changeOrigin: true },
+      '/setup':      { target: 'http://localhost:3000', changeOrigin: true },
+      '/health':     { target: 'http://localhost:3000', changeOrigin: true },
+      '/tv-schedule':{ target: 'http://localhost:3000', changeOrigin: true },
+      '/ws': {
+        target: 'ws://localhost:3000',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
   },
-  // En dev, le client API utilise VITE_API_URL=http://localhost:3000 directement
-  // (pas de proxy Vite pour éviter les conflits avec les routes SvelteKit)
 });

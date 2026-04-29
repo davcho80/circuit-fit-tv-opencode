@@ -4,7 +4,7 @@
 // En prod, BASE_URL est vide (même origine)
 // ============================================================
 
-// En dev : VITE_API_URL=http://localhost:3000 (défini dans .env.development)
+// En dev : VITE_API_URL vide → même origine, proxy Vite achemine vers le backend
 // En prod : vide → même origine (Fastify sert le frontend)
 const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
 
