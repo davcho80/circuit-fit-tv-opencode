@@ -59,10 +59,25 @@ const app = Fastify({ logger: loggerConfig });
 
 // ---- Plugins ----
 
-// CORS : autorisé en dev depuis le dev server Vite (5173)
+// CORS : en dev, autorise tout le réseau local sur le port Vite (5173)
 await app.register(cors, {
   origin: config.isDev
-    ? ['http://localhost:5173', 'http://127.0.0.1:5173']
+    ? (origin, cb) => {
+        // Autorise localhost, 127.0.0.1, et toute IP privée (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        if (!origin) return cb(null, true);
+        try {
+          const host = new URL(origin).hostname;
+          const ok =
+            host === 'localhost' ||
+            host === '127.0.0.1' ||
+            /^192\.168\./.test(host) ||
+            /^10\./.test(host) ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+          cb(null, ok);
+        } catch {
+          cb(null, false);
+        }
+      }
     : false,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
