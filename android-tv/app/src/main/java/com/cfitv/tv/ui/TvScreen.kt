@@ -609,84 +609,94 @@ private fun FloorPlanView(
         (0 until n - 1).map { it to it + 1 }
     }
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val radiusPx = (if (isActive) 26 else 20).dp.toPx()
+    val bubbleDp  = if (isActive) 52.dp else 40.dp
+    val halfBubble = bubbleDp / 2
 
-        fun toARGB(c: Color): Int = android.graphics.Color.argb(
-            (c.alpha * 255).toInt().coerceIn(0, 255),
-            (c.red   * 255).toInt().coerceIn(0, 255),
-            (c.green * 255).toInt().coerceIn(0, 255),
-            (c.blue  * 255).toInt().coerceIn(0, 255),
-        )
+    Box(modifier = modifier) {
 
-        // ── Liens entre stations ──────────────────────────────
-        links.forEach { (fi, ti) ->
-            val (_, fx, fy) = positions[fi]
-            val (_, tx, ty) = positions[ti]
-            val sx = fx * w; val sy = fy * h
-            val ex = tx * w; val ey = ty * h
-            val lw = if (isTransition) 2.dp.toPx() else 1.dp.toPx()
-            val lc = if (isTransition) accent.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.13f)
+        // ── Couche Canvas : liens + cercles (pas de texte) ────
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val radiusPx = halfBubble.toPx()
 
-            drawLine(lc, Offset(sx, sy), Offset(ex, ey), lw, StrokeCap.Round)
+            links.forEach { (fi, ti) ->
+                val (_, fx, fy) = positions[fi]
+                val (_, tx, ty) = positions[ti]
+                val sx = fx * w; val sy = fy * h
+                val ex = tx * w; val ey = ty * h
+                val lw = if (isTransition) 2.dp.toPx() else 1.dp.toPx()
+                val lc = if (isTransition) accent.copy(alpha = 0.7f)
+                         else Color.White.copy(alpha = 0.13f)
 
-            // Flèche à 65% du segment
-            val mx = sx + (ex - sx) * 0.65f
-            val my = sy + (ey - sy) * 0.65f
-            val ang = atan2(ey - sy, ex - sx)
-            val asz = if (isTransition) 10.dp.toPx() else 5.dp.toPx()
-            val arrowPath = Path().apply {
-                moveTo(mx - asz * cos(ang - 0.45f), my - asz * sin(ang - 0.45f))
-                lineTo(mx + asz * cos(ang),         my + asz * sin(ang))
-                lineTo(mx - asz * cos(ang + 0.45f), my - asz * sin(ang + 0.45f))
+                drawLine(lc, Offset(sx, sy), Offset(ex, ey), lw, StrokeCap.Round)
+
+                val mx = sx + (ex - sx) * 0.65f
+                val my = sy + (ey - sy) * 0.65f
+                val ang = atan2(ey - sy, ex - sx)
+                val asz = if (isTransition) 10.dp.toPx() else 5.dp.toPx()
+                val arrowPath = Path().apply {
+                    moveTo(mx - asz * cos(ang - 0.45f), my - asz * sin(ang - 0.45f))
+                    lineTo(mx + asz * cos(ang),          my + asz * sin(ang))
+                    lineTo(mx - asz * cos(ang + 0.45f), my - asz * sin(ang + 0.45f))
+                }
+                drawPath(arrowPath, lc, style = Stroke(lw))
             }
-            drawPath(arrowPath, lc, style = Stroke(lw))
+
+            positions.forEach { (_, x, y) ->
+                val cx = x * w; val cy = y * h
+
+                if (isWork) {
+                    drawCircle(accent.copy(alpha = pulseAlpha * 0.3f), radiusPx * 1.9f, Offset(cx, cy))
+                }
+                val fillColor = when {
+                    isWork       -> accent.copy(alpha = 0.6f)
+                    isTransition -> accent.copy(alpha = 0.35f)
+                    else         -> Color(0xFF1E293B)
+                }
+                drawCircle(fillColor, radiusPx, Offset(cx, cy))
+                drawCircle(
+                    color  = if (isActive) accent else Color(0xFF475569),
+                    radius = radiusPx,
+                    center = Offset(cx, cy),
+                    style  = Stroke(if (isActive) 2.dp.toPx() else 1.dp.toPx()),
+                )
+            }
         }
 
-        // ── Bulles de station ─────────────────────────────────
-        positions.forEachIndexed { i, (station, x, y) ->
-            val cx = x * w; val cy = y * h
+        // ── Surcouche Compose : numéros + noms ───────────────
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val cw = maxWidth
+            val ch = maxHeight
 
-            // Halo pulsant (WORK)
-            if (isWork) {
-                drawCircle(accent.copy(alpha = pulseAlpha * 0.3f), radiusPx * 1.9f, Offset(cx, cy))
-            }
-
-            val fillColor = when {
-                isWork       -> accent.copy(alpha = 0.6f)
-                isTransition -> accent.copy(alpha = 0.35f)
-                else         -> Color(0xFF1E293B)
-            }
-            val strokeColor = if (isActive) accent else Color(0xFF475569)
-            val strokeWidth = if (isActive) 2.dp.toPx() else 1.dp.toPx()
-
-            drawCircle(fillColor, radiusPx, Offset(cx, cy))
-            drawCircle(strokeColor, radiusPx, Offset(cx, cy), style = Stroke(strokeWidth))
-
-            // Texte via native canvas
-            drawIntoCanvas { canvas ->
-                val nc = canvas.nativeCanvas
-                val numPaint = android.graphics.Paint().apply {
-                    color = if (isActive) android.graphics.Color.WHITE
-                            else android.graphics.Color.argb(200, 148, 163, 184)
-                    textSize = (if (isActive) 15 else 12).dp.toPx()
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
-                }
-                nc.drawText("${i + 1}", cx, cy + numPaint.textSize * 0.37f, numPaint)
-
-                station.exercises.firstOrNull()?.exercise?.name?.let { name ->
-                    val lp = android.graphics.Paint().apply {
-                        color = if (isActive) toARGB(accent) else android.graphics.Color.argb(160, 100, 116, 139)
-                        textSize = 8.dp.toPx()
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        isAntiAlias = true
+            positions.forEachIndexed { i, (station, x, y) ->
+                Column(
+                    modifier = Modifier
+                        .absoluteOffset(x = cw * x - halfBubble, y = ch * y - halfBubble)
+                        .width(bubbleDp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(Modifier.size(bubbleDp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text       = "${i + 1}",
+                            fontSize   = if (isActive) 15.sp else 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color      = if (isActive) Color.White else Color.White.copy(alpha = 0.45f),
+                            textAlign  = TextAlign.Center,
+                        )
                     }
-                    val short = if (name.length > 14) name.take(13) + "…" else name
-                    nc.drawText(short, cx, cy + radiusPx + 14.dp.toPx(), lp)
+                    if (n <= 16) {
+                        station.exercises.firstOrNull()?.exercise?.name?.let { name ->
+                            Text(
+                                text     = if (name.length > 12) name.take(11) + "…" else name,
+                                fontSize = 7.sp,
+                                color    = if (isActive) accent.copy(alpha = 0.9f)
+                                           else Color.White.copy(alpha = 0.3f),
+                                textAlign = TextAlign.Center,
+                                maxLines  = 1,
+                            )
+                        }
+                    }
                 }
             }
         }
