@@ -666,7 +666,8 @@ private fun FloorPlanView(
             drawCircle(strokeColor, radiusPx, Offset(cx, cy), style = Stroke(strokeWidth))
 
             // Texte via native canvas
-            drawContext.canvas.nativeCanvas.apply {
+            drawIntoCanvas { canvas ->
+                val nc = canvas.nativeCanvas
                 val numPaint = android.graphics.Paint().apply {
                     color = if (isActive) android.graphics.Color.WHITE
                             else android.graphics.Color.argb(200, 148, 163, 184)
@@ -675,7 +676,7 @@ private fun FloorPlanView(
                     textAlign = android.graphics.Paint.Align.CENTER
                     isAntiAlias = true
                 }
-                drawText("${i + 1}", cx, cy + numPaint.textSize * 0.37f, numPaint)
+                nc.drawText("${i + 1}", cx, cy + numPaint.textSize * 0.37f, numPaint)
 
                 station.exercises.firstOrNull()?.exercise?.name?.let { name ->
                     val lp = android.graphics.Paint().apply {
@@ -685,7 +686,7 @@ private fun FloorPlanView(
                         isAntiAlias = true
                     }
                     val short = if (name.length > 14) name.take(13) + "…" else name
-                    drawText(short, cx, cy + radiusPx + 14.dp.toPx(), lp)
+                    nc.drawText(short, cx, cy + radiusPx + 14.dp.toPx(), lp)
                 }
             }
         }
