@@ -29,11 +29,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cfitv.tv.ws.ExerciseData
+import com.cfitv.tv.ws.LayoutLink
 import com.cfitv.tv.ws.ScheduleDay
+import com.cfitv.tv.ws.SessionPayload
+import com.cfitv.tv.ws.StationResponse
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.atan2
 import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.sin
 
 // ============================================================
 // Écran d'affichage TV — grille d'exercices + timer
@@ -552,6 +558,140 @@ private fun ExerciseCard(
     }
 }
 
+// ── Plan de salle ────────────────────────────────────────────
+
+@Composable
+private fun FloorPlanView(
+    stations: List<StationResponse>,
+    layoutLinks: List<LayoutLink>?,
+    session: SessionPayload?,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val phaseType = session?.phase?.type ?: "WAIT"
+    val isWork       = phaseType == "WORK"
+    val isTransition = phaseType == "TRANSITION"
+    val isActive     = isWork || isTransition
+    val n = stations.size
+
+    val pulse = rememberInfiniteTransition(label = "fp")
+    val pulseAlpha by pulse.animateFloat(
+        initialValue = 0.18f, targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "fp-a",
+    )
+
+    val sorted = remember(stations) { stations.sortedBy { it.position } }
+
+    fun autoPos(i: Int): Pair<Float, Float> {
+        val cols = if (n <= 4) 2 else if (n <= 9) 3 else 4
+        val rows = ceil(n.toDouble() / cols).toInt()
+        val col = i % cols
+        val row = i / cols
+        val xi = if (row % 2 == 0) col else cols - 1 - col
+        val x = 0.08f + xi * (0.84f / maxOf(1, cols - 1))
+        val y = if (rows <= 1) 0.5f else 0.12f + row * (0.76f / maxOf(1, rows - 1))
+        return x to y
+    }
+
+    val positions = sorted.mapIndexed { i, st ->
+        val (ax, ay) = autoPos(i)
+        Triple(st, st.layoutX ?: ax, st.layoutY ?: ay)
+    }
+
+    val idToIdx = sorted.withIndex().associate { (i, st) -> st.id to i }
+    val links: List<Pair<Int, Int>> = if (!layoutLinks.isNullOrEmpty()) {
+        layoutLinks.mapNotNull { lk ->
+            val f = idToIdx[lk.from]; val t = idToIdx[lk.to]
+            if (f != null && t != null) f to t else null
+        }
+    } else {
+        (0 until n - 1).map { it to it + 1 }
+    }
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val radiusPx = (if (isActive) 26 else 20).dp.toPx()
+
+        fun toARGB(c: Color): Int = android.graphics.Color.argb(
+            (c.alpha * 255).toInt().coerceIn(0, 255),
+            (c.red   * 255).toInt().coerceIn(0, 255),
+            (c.green * 255).toInt().coerceIn(0, 255),
+            (c.blue  * 255).toInt().coerceIn(0, 255),
+        )
+
+        // ── Liens entre stations ──────────────────────────────
+        links.forEach { (fi, ti) ->
+            val (_, fx, fy) = positions[fi]
+            val (_, tx, ty) = positions[ti]
+            val sx = fx * w; val sy = fy * h
+            val ex = tx * w; val ey = ty * h
+            val lw = if (isTransition) 2.dp.toPx() else 1.dp.toPx()
+            val lc = if (isTransition) accent.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.13f)
+
+            drawLine(lc, Offset(sx, sy), Offset(ex, ey), lw, StrokeCap.Round)
+
+            // Flèche à 65% du segment
+            val mx = sx + (ex - sx) * 0.65f
+            val my = sy + (ey - sy) * 0.65f
+            val ang = atan2(ey - sy, ex - sx)
+            val asz = if (isTransition) 10.dp.toPx() else 5.dp.toPx()
+            val arrowPath = Path().apply {
+                moveTo(mx - asz * cos(ang - 0.45f), my - asz * sin(ang - 0.45f))
+                lineTo(mx + asz * cos(ang),         my + asz * sin(ang))
+                lineTo(mx - asz * cos(ang + 0.45f), my - asz * sin(ang + 0.45f))
+            }
+            drawPath(arrowPath, lc, style = Stroke(lw))
+        }
+
+        // ── Bulles de station ─────────────────────────────────
+        positions.forEachIndexed { i, (station, x, y) ->
+            val cx = x * w; val cy = y * h
+
+            // Halo pulsant (WORK)
+            if (isWork) {
+                drawCircle(accent.copy(alpha = pulseAlpha * 0.3f), radiusPx * 1.9f, Offset(cx, cy))
+            }
+
+            val fillColor = when {
+                isWork       -> accent.copy(alpha = 0.6f)
+                isTransition -> accent.copy(alpha = 0.35f)
+                else         -> Color(0xFF1E293B)
+            }
+            val strokeColor = if (isActive) accent else Color(0xFF475569)
+            val strokeWidth = if (isActive) 2.dp.toPx() else 1.dp.toPx()
+
+            drawCircle(fillColor, radiusPx, Offset(cx, cy))
+            drawCircle(strokeColor, radiusPx, Offset(cx, cy), style = Stroke(strokeWidth))
+
+            // Texte via native canvas
+            drawContext.canvas.nativeCanvas.apply {
+                val numPaint = android.graphics.Paint().apply {
+                    color = if (isActive) android.graphics.Color.WHITE
+                            else android.graphics.Color.argb(200, 148, 163, 184)
+                    textSize = (if (isActive) 15 else 12).dp.toPx()
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    isAntiAlias = true
+                }
+                drawText("${i + 1}", cx, cy + numPaint.textSize * 0.37f, numPaint)
+
+                station.exercises.firstOrNull()?.exercise?.name?.let { name ->
+                    val lp = android.graphics.Paint().apply {
+                        color = if (isActive) toARGB(accent) else android.graphics.Color.argb(160, 100, 116, 139)
+                        textSize = 8.dp.toPx()
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                    }
+                    val short = if (name.length > 14) name.take(13) + "…" else name
+                    drawText(short, cx, cy + radiusPx + 14.dp.toPx(), lp)
+                }
+            }
+        }
+    }
+}
+
 // ── Dashboard (vue d'ensemble) ───────────────────────────────
 
 @Composable
@@ -677,94 +817,18 @@ private fun DashboardScreen(uiState: TvViewModel.UiState, onDisconnect: () -> Un
                     .background(Color.White.copy(alpha = 0.1f))
             )
 
-            // Panneau droit — grille des stations
-            val totalStations  = circuit?.stations?.size ?: session?.totalPhases?.let { it / 2 } ?: 0
-            val allActive      = session?.phase?.type == "WORK"
-            val isTransition   = session?.phase?.type == "TRANSITION"
+            // Panneau droit — plan de salle
+            val sortedStations = circuit?.stations?.sortedBy { it.position } ?: emptyList()
 
-            if (totalStations > 0) {
-                val cols = when {
-                    totalStations <= 4  -> 2
-                    totalStations <= 6  -> 3
-                    totalStations <= 9  -> 3
-                    else                -> 4
-                }
-                val rows = ceil(totalStations.toDouble() / cols).toInt()
-
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    repeat(rows) { row ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            val start = row * cols
-                            val end   = minOf(start + cols, totalStations)
-                            for (idx in start until end) {
-                                // Toutes les stations sont actives pendant WORK
-                                // Pendant TRANSITION, toutes légèrement surlignées (ambre/dim)
-                                val cardActive = allActive || isTransition
-                                val cardAlpha  = when {
-                                    allActive    -> 0.25f
-                                    isTransition -> 0.15f
-                                    else         -> 0.0f
-                                }
-                                val textAlpha  = when {
-                                    allActive    -> 1.0f
-                                    isTransition -> 0.65f
-                                    else         -> 0.4f
-                                }
-                                val stationExercises = circuit?.stations
-                                    ?.sortedBy { it.position }
-                                    ?.getOrNull(idx)
-                                    ?.exercises
-                                    ?.map { it.exercise }
-                                    ?: emptyList()
-
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            if (cardActive) animAcc.copy(alpha = cardAlpha)
-                                            else Color.Black.copy(alpha = 0.2f)
-                                        ),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.padding(10.dp),
-                                    ) {
-                                        Text(
-                                            text = "${idx + 1}",
-                                            fontSize = if (totalStations <= 4) 36.sp else 24.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = if (cardActive) animAcc else Color.White.copy(alpha = 0.4f),
-                                        )
-                                        if (stationExercises.isNotEmpty()) {
-                                            Text(
-                                                text = stationExercises.first().name,
-                                                fontSize = 11.sp,
-                                                color = Color.White.copy(alpha = textAlpha),
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            // Cases vides
-                            repeat(cols - (end - start)) {
-                                Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
+            if (sortedStations.isNotEmpty()) {
+                // Plan de salle — auto-arrange si aucune position configurée dans l'admin
+                FloorPlanView(
+                    stations = sortedStations,
+                    layoutLinks = circuit?.layoutLinks,
+                    session = session,
+                    accent = animAcc,
+                    modifier = Modifier.weight(1f).fillMaxHeight().padding(12.dp),
+                )
             } else {
                 Box(
                     modifier = Modifier.weight(1f).fillMaxHeight(),

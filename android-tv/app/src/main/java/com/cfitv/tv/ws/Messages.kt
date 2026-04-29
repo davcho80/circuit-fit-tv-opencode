@@ -72,6 +72,12 @@ data class SessionPayload(
 // ---- Types REST circuit ----
 
 @Serializable
+data class LayoutLink(
+    val from: String,
+    val to: String,
+)
+
+@Serializable
 data class CircuitResponse(
     val id: String,
     val name: String,
@@ -79,6 +85,7 @@ data class CircuitResponse(
     val restSec: Int,
     val transitionSec: Int,
     val stations: List<StationResponse>,
+    val layoutLinks: List<LayoutLink>? = null,
 )
 
 @Serializable
@@ -89,6 +96,8 @@ data class StationResponse(
     val stationMode: String = "TIME",
     val sets: Int? = null,
     val reps: Int? = null,
+    val layoutX: Float? = null,
+    val layoutY: Float? = null,
 )
 
 @Serializable
