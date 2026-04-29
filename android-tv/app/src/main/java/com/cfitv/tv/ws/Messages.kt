@@ -128,6 +128,26 @@ data class PairConfig(
     val logoUrl: String? = null,
 ) : ServerMessage()
 
+// ---- Calendrier TV ----
+
+@Serializable
+data class ScheduleDay(
+    val date:      String,
+    val label:     String,
+    val dayOfWeek: Int,
+    val classes:   List<ScheduleClass>,
+)
+
+@Serializable
+data class ScheduleClass(
+    val scheduleId: String,
+    val circuitId:  String,
+    val name:       String,
+    val icon:       String? = null,
+    val timeHour:   Int,
+    val timeMinute: String,  // "09:30"
+)
+
 // ---- Client → Serveur ----
 
 @Serializable

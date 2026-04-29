@@ -245,6 +245,14 @@ fun SetupScreen(
                                     modifier = Modifier.weight(1f),
                                     onClick  = { onScreenTypeChange(TvViewModel.ScreenType.DASHBOARD) },
                                 )
+                                TypeButton(
+                                    icon     = "📅",
+                                    label    = "Calendrier",
+                                    desc     = "Horaire semaine",
+                                    selected = screenType == TvViewModel.ScreenType.SCHEDULE,
+                                    modifier = Modifier.weight(1f),
+                                    onClick  = { onScreenTypeChange(TvViewModel.ScreenType.SCHEDULE) },
+                                )
                             }
                         }
 

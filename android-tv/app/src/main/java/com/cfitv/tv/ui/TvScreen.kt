@@ -29,6 +29,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cfitv.tv.ws.ExerciseData
+import com.cfitv.tv.ws.ScheduleDay
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.ceil
 
 // ============================================================
@@ -82,6 +86,10 @@ fun TvScreen(uiState: TvViewModel.UiState, onDisconnect: () -> Unit) {
 
     if (uiState.screenType == TvViewModel.ScreenType.DASHBOARD) {
         DashboardScreen(uiState = uiState, onDisconnect = onDisconnect)
+        return
+    }
+    if (uiState.screenType == TvViewModel.ScreenType.SCHEDULE) {
+        ScheduleScreen(uiState = uiState, onDisconnect = onDisconnect)
         return
     }
 
@@ -811,6 +819,257 @@ private fun DashboardScreen(uiState: TvViewModel.UiState, onDisconnect: () -> Un
             SessionEndedOverlay(reason = reason)
         }
     }
+}
+
+// ── Calendrier TV ────────────────────────────────────────────
+
+@Composable
+private fun ScheduleScreen(uiState: TvViewModel.UiState, onDisconnect: () -> Unit) {
+    val days     = uiState.scheduleDays
+    val primary  = remember(uiState.primaryColor) {
+        try { Color(android.graphics.Color.parseColor(uiState.primaryColor)) }
+        catch (_: Exception) { Color(0xFF0EA5E9) }
+    }
+
+    // Horloge locale
+    var now by remember { mutableStateOf(LocalTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1_000)
+            now = LocalTime.now()
+        }
+    }
+    val todayStr = LocalDate.now().toString() // YYYY-MM-DD
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF020617)),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // ── Header ──────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0F172A))
+                    .padding(horizontal = 32.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    androidx.compose.material3.TextButton(onClick = onDisconnect) {
+                        Text(
+                            text = uiState.label,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.55f),
+                        )
+                    }
+                    Text(
+                        text = "CALENDRIER DE LA SEMAINE",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 3.sp,
+                        color = primary.copy(alpha = 0.7f),
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = now.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Black,
+                        color = primary,
+                    )
+                    ConnectionDot(connected = uiState.connected, accent = primary)
+                }
+            }
+
+            // ── Grille 7 jours ──────────────────────────────────
+            if (days.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Chargement du calendrier…",
+                        fontSize = 20.sp,
+                        color = Color.White.copy(alpha = 0.25f),
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    days.forEach { day ->
+                        val isToday = day.date == todayStr
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isToday) primary.copy(alpha = 0.10f)
+                                    else Color(0xFF0F172A)
+                                )
+                                .then(
+                                    if (isToday) Modifier.border(primary)
+                                    else Modifier
+                                ),
+                        ) {
+                            // En-tête du jour
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        if (isToday) primary.copy(alpha = 0.15f)
+                                        else Color(0xFF1E293B).copy(alpha = 0.5f)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                            ) {
+                                Text(
+                                    text = dayName(day.dayOfWeek).uppercase(),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 2.sp,
+                                    color = if (isToday) primary else Color(0xFF94A3B8),
+                                )
+                                Text(
+                                    text = dayNumber(day.date),
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (isToday) Color.White else Color(0xFF64748B),
+                                    lineHeight = 24.sp,
+                                )
+                                if (isToday) {
+                                    Text(
+                                        text = "AUJOURD'HUI",
+                                        fontSize = 7.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp,
+                                        color = primary,
+                                    )
+                                }
+                            }
+
+                            // Liste des cours
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                if (day.classes.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text("—", fontSize = 14.sp, color = Color(0xFF334155))
+                                    }
+                                } else {
+                                    day.classes.forEach { cls ->
+                                        val upcoming = isUpcoming(cls, day.date, todayStr, now)
+                                        val past     = isPastClass(cls, day.date, todayStr, now)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(
+                                                    when {
+                                                        upcoming -> primary.copy(alpha = 0.20f)
+                                                        past     -> Color(0xFF1E293B).copy(alpha = 0.3f)
+                                                        isToday  -> Color(0xFF1E293B).copy(alpha = 0.7f)
+                                                        else     -> Color(0xFF1E293B).copy(alpha = 0.4f)
+                                                    }
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            Text(
+                                                text = cls.icon ?: "🏋️",
+                                                fontSize = 14.sp,
+                                            )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = cls.name,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (past) Color(0xFF475569) else Color.White,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    text = cls.timeMinute,
+                                                    fontSize = 9.sp,
+                                                    color = if (upcoming) primary else Color(0xFF64748B),
+                                                    fontWeight = FontWeight.Medium,
+                                                )
+                                            }
+                                            if (upcoming) {
+                                                Text(
+                                                    text = "▶",
+                                                    fontSize = 8.sp,
+                                                    color = primary,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun Modifier.border(color: Color): Modifier =
+    this.then(Modifier.padding(1.dp).clip(RoundedCornerShape(16.dp)))
+
+private fun dayName(isoDay: Int): String = when (isoDay) {
+    1 -> "Lun"; 2 -> "Mar"; 3 -> "Mer"; 4 -> "Jeu"
+    5 -> "Ven"; 6 -> "Sam"; 7 -> "Dim"; else -> ""
+}
+
+private fun dayNumber(dateStr: String): String =
+    try { LocalDate.parse(dateStr).dayOfMonth.toString() } catch (_: Exception) { "" }
+
+private fun isUpcoming(
+    cls: com.cfitv.tv.ws.ScheduleClass,
+    dateStr: String, todayStr: String, now: LocalTime,
+): Boolean {
+    if (dateStr != todayStr) return false
+    val parts = cls.timeMinute.split(":")
+    val h = parts.getOrNull(0)?.toIntOrNull() ?: return false
+    val m = parts.getOrNull(1)?.toIntOrNull() ?: return false
+    val classMin = h * 60 + m
+    val nowMin   = now.hour * 60 + now.minute
+    return classMin in nowMin..(nowMin + 90)
+}
+
+private fun isPastClass(
+    cls: com.cfitv.tv.ws.ScheduleClass,
+    dateStr: String, todayStr: String, now: LocalTime,
+): Boolean {
+    if (dateStr != todayStr) return false
+    val parts = cls.timeMinute.split(":")
+    val h = parts.getOrNull(0)?.toIntOrNull() ?: return false
+    val m = parts.getOrNull(1)?.toIntOrNull() ?: return false
+    val classMin = h * 60 + m
+    val nowMin   = now.hour * 60 + now.minute
+    return classMin < nowMin - 5
 }
 
 // ── Pause eau overlay ────────────────────────────────────────

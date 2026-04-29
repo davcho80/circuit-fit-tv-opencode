@@ -33,7 +33,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Enums ----
 
-    enum class ScreenType { STATION, DASHBOARD }
+    enum class ScreenType { STATION, DASHBOARD, SCHEDULE }
 
     // ---- État UI ----
 
@@ -58,6 +58,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         val progressFrac: Float       = 0f,
         val hydrationRemainingSec: Int = 0,
         val sessionEndedReason: String? = null,  // "completed" | "stopped" | null
+        val scheduleDays: List<com.cfitv.tv.ws.ScheduleDay> = emptyList(),
     ) {
         enum class Screen { SETUP, DISPLAY }
 
@@ -148,10 +149,11 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     private var clockOffset: Long   = 0L
     private var lastFetchedCircuitId = ""
 
-    private var reconnectJob: Job?  = null
-    private var heartbeatJob: Job?  = null
-    private var clockJob: Job?      = null
-    private var timerJob: Job?      = null
+    private var reconnectJob: Job?       = null
+    private var heartbeatJob: Job?       = null
+    private var clockJob: Job?           = null
+    private var timerJob: Job?           = null
+    private var scheduleRefreshJob: Job? = null
 
     // ---- Auto-connexion si config complète ----
 
@@ -161,6 +163,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
             // Config complète sauvegardée → connexion directe, sans interaction
             createAndConnect(s.serverUrl, s.label)
             startTimerTick()
+            if (s.screenType == ScreenType.SCHEDULE) startScheduleRefresh()
         } else {
             // Pas de config → tentative de découverte mDNS automatique
             startMdnsDiscovery()
@@ -184,6 +187,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(screen = UiState.Screen.DISPLAY, isPairing = false) }
         createAndConnect(s.serverUrl, s.label)
         startTimerTick()
+        if (s.screenType == ScreenType.SCHEDULE) startScheduleRefresh()
     }
 
     /** Mode appairage : connexion et affichage du PIN */
@@ -407,7 +411,11 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 is PairConfig -> {
                     // Config reçue de la console → sauvegarder et démarrer l'affichage
-                    val screenType = if (msg.screenType == "DASHBOARD") ScreenType.DASHBOARD else ScreenType.STATION
+                    val screenType = when (msg.screenType) {
+                        "DASHBOARD" -> ScreenType.DASHBOARD
+                        "SCHEDULE"  -> ScreenType.SCHEDULE
+                        else        -> ScreenType.STATION
+                    }
                     val newState = _ui.value.copy(
                         screen        = UiState.Screen.DISPLAY,
                         isPairing     = false,
@@ -422,6 +430,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                     saveConfig(newState)
                     _ui.update { newState }
                     startTimerTick()
+                    if (screenType == ScreenType.SCHEDULE) startScheduleRefresh()
                     // Reconnexion avec le bon label
                     val url = newState.serverUrl
                     val lbl = newState.label
@@ -523,6 +532,28 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- Calendrier TV ----
+
+    fun startScheduleRefresh() {
+        scheduleRefreshJob?.cancel()
+        scheduleRefreshJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val httpBase = wsUrlToHttpBase(_ui.value.serverUrl)
+                    val body = withContext(Dispatchers.IO) {
+                        val req = okhttp3.Request.Builder().url("$httpBase/tv-schedule").build()
+                        httpClient.newCall(req).execute().use { it.body?.string() }
+                    }
+                    if (body != null) {
+                        val days = json.decodeFromString<List<com.cfitv.tv.ws.ScheduleDay>>(body)
+                        _ui.update { it.copy(scheduleDays = days) }
+                    }
+                } catch (_: Exception) { /* réseau indisponible */ }
+                delay(5 * 60 * 1_000L) // refresh toutes les 5 minutes
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopMdnsDiscovery()
@@ -531,6 +562,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         heartbeatJob?.cancel()
         clockJob?.cancel()
         timerJob?.cancel()
+        scheduleRefreshJob?.cancel()
         httpClient.dispatcher.executorService.shutdown()
     }
 }
