@@ -146,6 +146,11 @@ export interface ScheduledBreak {
   label:       string;
 }
 
+export interface LayoutLink {
+  from: string;
+  to: string;
+}
+
 export interface Circuit {
   id: string;
   name: string;
@@ -158,6 +163,7 @@ export interface Circuit {
   rotationMode: RotationMode;
   stations: CircuitStationData[];
   scheduledBreaks: ScheduledBreak[];
+  layoutLinks: LayoutLink[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -208,8 +214,9 @@ export const circuits = {
   updateLayout(
     id: string,
     stations: Array<{ id: string; layoutX: number; layoutY: number }>,
+    links: Array<{ from: string; to: string }>,
   ): Promise<Circuit> {
-    return request('PATCH', `/circuits/${id}/layout`, { stations });
+    return request('PATCH', `/circuits/${id}/layout`, { stations, links });
   },
 
   updateStations(

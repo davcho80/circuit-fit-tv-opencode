@@ -43,8 +43,11 @@
     await goto('/circuits');
   }
 
-  async function handleLayoutSave(positions: Array<{ id: string; layoutX: number; layoutY: number }>) {
-    circuit = await api.updateLayout(circuit.id, positions);
+  async function handleLayoutSave(
+    positions: Array<{ id: string; layoutX: number; layoutY: number }>,
+    links: Array<{ from: string; to: string }>,
+  ) {
+    circuit = await api.updateLayout(circuit.id, positions, links);
   }
 </script>
 
@@ -103,6 +106,7 @@
     {:else}
       <LayoutEditor
         stations={circuit.stations}
+        savedLinks={circuit.layoutLinks}
         onSave={handleLayoutSave}
       />
     {/if}

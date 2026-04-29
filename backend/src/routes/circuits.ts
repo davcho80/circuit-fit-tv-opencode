@@ -164,7 +164,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
     return circuit;
   });
 
-  // PATCH /circuits/:id/layout — met à jour uniquement les positions x/y des stations
+  // PATCH /circuits/:id/layout — met à jour les positions x/y des stations et les liens manuels
   app.patch<{ Params: { id: string } }>('/circuits/:id/layout', { preHandler: [requireAdmin] }, async (req, reply) => {
     const exists = await prisma.circuit.findUnique({ where: { id: req.params.id } });
     if (!exists) return reply.code(404).send({ error: 'Circuit not found' });
@@ -175,19 +175,29 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
         layoutX: z.number().min(0).max(1),
         layoutY: z.number().min(0).max(1),
       })),
+      links: z.array(z.object({
+        from: z.string().uuid(),
+        to:   z.string().uuid(),
+      })).optional(),
     });
 
     const body = LayoutUpdate.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
-    await Promise.all(
-      body.data.stations.map((s) =>
+    await Promise.all([
+      ...body.data.stations.map((s) =>
         prisma.circuitStation.update({
           where: { id: s.id },
           data: { layoutX: s.layoutX, layoutY: s.layoutY },
         }),
       ),
-    );
+      ...(body.data.links !== undefined
+        ? [prisma.circuit.update({
+            where: { id: req.params.id },
+            data:  { layoutLinks: body.data.links },
+          })]
+        : []),
+    ]);
 
     const circuit = await prisma.circuit.findUnique({ where: { id: req.params.id }, include: circuitInclude });
     return circuit;
