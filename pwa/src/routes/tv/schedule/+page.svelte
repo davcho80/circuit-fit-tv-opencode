@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
+  import { createWsConnection, type WsConnection } from '$lib/ws.svelte.js';
+  import { loadTvConfig, type TvConfig } from '$lib/tvConfig.js';
 
   // ---- Types ----
   interface ScheduledClass {
@@ -26,6 +28,8 @@
   let loading     = $state(true);
   let now         = $state(new Date());
   let fetchError  = $state(false);
+  let savedConfig = $state<TvConfig | null>(null);
+  let conn        = $state<WsConnection | null>(null);
 
   // ---- Clock ----
   const clockInterval = setInterval(() => { now = new Date(); }, 1000);
@@ -52,12 +56,18 @@
 
   onMount(async () => {
     await Promise.all([loadSettings(), fetchSchedule()]);
+    const config = loadTvConfig();
+    if (config?.mode === 'schedule') {
+      savedConfig = config;
+      conn = createWsConnection('tv', config.label, { displayId: config.displayId });
+    }
     applyBranding();
   });
 
   onDestroy(() => {
     clearInterval(clockInterval);
     clearInterval(refreshInterval);
+    conn?.destroy();
   });
 
   // ---- Helpers ----
@@ -126,6 +136,11 @@
       <p class="text-xs text-slate-500 mt-1 uppercase tracking-widest">
         {capitalize(now.toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }))}
       </p>
+      {#if savedConfig}
+        <p class="text-xs mt-2 {conn?.connected ? 'text-emerald-400' : 'text-amber-400'}">
+          {conn?.connected ? 'LIVE' : 'Reconnexion...'}
+        </p>
+      {/if}
     </div>
   </header>
 

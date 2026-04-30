@@ -3,19 +3,27 @@
   import { createWsConnection } from '$lib/ws.svelte.js';
   import { circuits as api, type Circuit } from '$lib/api';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
+  import { loadTvConfig, type TvConfig } from '$lib/tvConfig.js';
 
   onMount(async () => {
     await loadSettings();
+    const config = loadTvConfig();
+    if (config?.mode === 'central') {
+      savedConfig = config;
+      label = config.label;
+      start();
+    }
     applyBranding();
   });
 
   // ---- Setup ----
   let label = $state('TV Centrale');
   let conn = $state<ReturnType<typeof createWsConnection> | null>(null);
+  let savedConfig = $state<TvConfig | null>(null);
 
   function start() {
     conn?.destroy();
-    conn = createWsConnection('tv', label);
+    conn = createWsConnection('tv', label, savedConfig ? { displayId: savedConfig.displayId } : {});
   }
   onDestroy(() => conn?.destroy());
 

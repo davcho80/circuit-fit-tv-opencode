@@ -4,9 +4,19 @@
   import { createWsConnection, type WsConnection } from '$lib/ws.svelte.js';
   import { circuits as api, type Circuit, type Exercise } from '$lib/api';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
+  import {
+    clearTvConfig,
+    loadTvConfig,
+    saveTvConfig,
+    screenRouteFor,
+    type PairConfigPayload,
+    type TvConfig,
+  } from '$lib/tvConfig.js';
 
   onMount(async () => {
     await loadSettings();
+    const config = loadTvConfig();
+    if (config) resumeConfig(config);
     applyBranding();
   });
 
@@ -16,6 +26,28 @@
   let stationNumber = $state(1);          // 1-basé → correspond à circuit.stations[n-1]
   let orientation   = $state<'landscape' | 'portrait'>('landscape');
   let conn          = $state<WsConnection | null>(null);
+  let savedConfig   = $state<TvConfig | null>(null);
+  let pairingPin    = $state('');
+  let pairConn      = $state<WsConnection | null>(null);
+
+  function applyConfig(config: TvConfig) {
+    savedConfig = config;
+    label = config.label;
+    stationNumber = config.stationNumber;
+    screenType = config.mode === 'central' ? 'dashboard' : config.mode;
+    orientation = config.isLandscape ? 'landscape' : 'portrait';
+  }
+
+  function resumeConfig(config: TvConfig) {
+    applyConfig(config);
+    const route = screenRouteFor(config);
+    if (route !== '/tv') {
+      goto(route);
+      return;
+    }
+    conn?.destroy();
+    conn = createWsConnection('tv', config.label, { displayId: config.displayId });
+  }
 
   function start() {
     if (screenType === 'dashboard') {
@@ -27,9 +59,64 @@
       return;
     }
     conn?.destroy();
-    conn = createWsConnection('tv', label);
+    conn = createWsConnection('tv', label, savedConfig?.mode === 'station' ? { displayId: savedConfig.displayId } : {});
   }
+
+  function handlePairConfig(payload: PairConfigPayload) {
+    const config = saveTvConfig(payload);
+    pairConn?.destroy();
+    pairConn = null;
+    pairingPin = '';
+    applyConfig(config);
+
+    const route = screenRouteFor(config);
+    if (route !== '/tv') {
+      goto(route);
+      return;
+    }
+
+    conn?.destroy();
+    conn = createWsConnection('tv', config.label, { displayId: config.displayId });
+  }
+
+  function startPairing() {
+    pairingPin = String(Math.floor(1000 + Math.random() * 9000));
+    pairConn?.destroy();
+    pairConn = createWsConnection('tv', 'PWA TV en appairage', {
+      onPairConfig: handlePairConfig,
+    });
+  }
+
+  function cancelPairing() {
+    pairConn?.destroy();
+    pairConn = null;
+    pairingPin = '';
+  }
+
+  function forgetSavedConfig() {
+    clearTvConfig();
+    savedConfig = null;
+    conn?.destroy();
+    conn = null;
+    label = 'Station 1';
+    stationNumber = 1;
+    screenType = 'station';
+    orientation = 'landscape';
+  }
+
+  $effect(() => {
+    if (!pairConn?.connected || !pairingPin) return;
+    pairConn.send({
+      type: 'PAIR_REGISTER',
+      pin: pairingPin,
+      deviceModel: 'PWA TV',
+      deviceOs: navigator.userAgent,
+      appVersion: 'pwa',
+    });
+  });
+
   onDestroy(() => conn?.destroy());
+  onDestroy(() => pairConn?.destroy());
 
   // ════ Fetch circuit quand session démarre ════
   let circuitData  = $state<Circuit | null>(null);
@@ -164,6 +251,62 @@
       </div>
 
       <div class="space-y-5">
+        {#if savedConfig}
+          <div class="rounded-xl border border-emerald-700/50 bg-emerald-950/30 px-4 py-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-emerald-300">Écran appairé</p>
+                <p class="text-xs text-emerald-100/70 mt-0.5">
+                  {savedConfig.label} · {savedConfig.screenType}
+                </p>
+              </div>
+              <button
+                type="button"
+                onclick={forgetSavedConfig}
+                class="text-xs font-semibold text-emerald-200/80 hover:text-white"
+              >
+                Oublier
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        <div class="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-sm font-bold text-slate-200">Appairage console</p>
+              <p class="text-xs text-slate-500 mt-0.5">Génère un PIN visible dans l'admin.</p>
+            </div>
+            {#if pairingPin}
+              <button
+                type="button"
+                onclick={cancelPairing}
+                class="text-xs font-semibold text-slate-400 hover:text-slate-100"
+              >
+                Annuler
+              </button>
+            {:else}
+              <button
+                type="button"
+                onclick={startPairing}
+                class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-xs font-bold hover:bg-slate-700"
+              >
+                Obtenir un code
+              </button>
+            {/if}
+          </div>
+          {#if pairingPin}
+            <div class="flex items-center justify-between rounded-lg bg-slate-950 border border-slate-800 px-4 py-3">
+              <div>
+                <p class="text-xs uppercase tracking-widest text-slate-500">Code PIN</p>
+                <p class="text-4xl font-black tabular-nums text-sky-300 leading-none mt-1">{pairingPin}</p>
+              </div>
+              <p class="text-xs text-right {pairConn?.connected ? 'text-emerald-400' : 'text-amber-400'}">
+                {pairConn?.connected ? 'En attente admin' : 'Connexion...'}
+              </p>
+            </div>
+          {/if}
+        </div>
 
         <!-- Type d'écran -->
         <div class="space-y-1.5">

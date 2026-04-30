@@ -6,6 +6,8 @@
 // - Heartbeat toutes les 10 s
 // ============================================================
 
+import type { PairConfigPayload } from './tvConfig.js';
+
 const WS_URL = (import.meta.env['VITE_API_URL'] as string | undefined ?? 'http://localhost:3000')
   .replace(/^http/, 'ws') + '/ws';
 
@@ -45,7 +47,12 @@ export interface ClientInfo {
 
 // ---- Factory ----
 
-export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: string) {
+export interface WsConnectionOptions {
+  displayId?: string;
+  onPairConfig?: (config: PairConfigPayload) => void;
+}
+
+export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: string, options: WsConnectionOptions = {}) {
   // Reactive state (Svelte 5 runes — .svelte.ts only)
   let connected = $state(false);
   let session = $state<SessionPayload | null>(null);
@@ -69,6 +76,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
       reconnectDelay = 1_000;
 
       const registerMsg: Record<string, unknown> = { type: 'REGISTER', role, label };
+      if (options.displayId) registerMsg['displayId'] = options.displayId;
       const authToken = getWsAuthToken(role);
       if (authToken) registerMsg['authToken'] = authToken;
       ws!.send(JSON.stringify(registerMsg));
@@ -124,6 +132,17 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
       case 'SESSION_AUTO_STARTED':
         schedulerFiredAt = Date.now();
         setTimeout(() => { schedulerFiredAt = null; }, 8_000); // masquer après 8s
+        break;
+      case 'PAIR_CONFIG':
+        options.onPairConfig?.({
+          displayId: msg['displayId'] as string,
+          label: msg['label'] as string,
+          stationNumber: msg['stationNumber'] as number,
+          screenType: msg['screenType'] as PairConfigPayload['screenType'],
+          isLandscape: msg['isLandscape'] as boolean,
+          primaryColor: (msg['primaryColor'] as string | undefined) ?? null,
+          logoUrl: (msg['logoUrl'] as string | null | undefined) ?? null,
+        });
         break;
       case 'SESSION_ENDED':
         session = null;
