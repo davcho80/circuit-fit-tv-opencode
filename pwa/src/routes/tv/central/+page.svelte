@@ -72,6 +72,7 @@
 
   // ---- Dérivés ----
   const session = $derived(conn?.session ?? (offlineMode ? loadTvSessionSnapshot() : null));
+  const whiteboard = $derived(conn?.whiteboard ?? null);
 
   const remainingMs = $derived.by(() => {
     if (!session) return 0;
@@ -358,6 +359,74 @@
             {#if offlineMode || !conn.connected}
               <span class="text-xs text-amber-300 ml-auto">Mode cache</span>
             {/if}
+          </div>
+        </div>
+
+      {:else if whiteboard}
+        <!-- Whiteboard avant cours -->
+        <div class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+          <div>
+            <p class="text-xs text-sky-400 uppercase tracking-widest font-bold">Prochain circuit</p>
+            <h2 class="text-2xl font-black text-slate-100 leading-tight mt-1">{whiteboard.name}</h2>
+            {#if whiteboard.description}
+              <p class="text-sm text-slate-400 leading-snug mt-2">{whiteboard.description}</p>
+            {/if}
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div class="bg-slate-800/70 rounded-lg px-3 py-2">
+              <p class="text-xs text-slate-500 uppercase tracking-widest">Rounds</p>
+              <p class="text-2xl font-black text-slate-100">{whiteboard.rounds}</p>
+            </div>
+            <div class="bg-slate-800/70 rounded-lg px-3 py-2">
+              <p class="text-xs text-slate-500 uppercase tracking-widest">Travail</p>
+              <p class="text-2xl font-black text-slate-100">{whiteboard.workSec}s</p>
+            </div>
+            {#if whiteboard.warmupSec > 0}
+              <div class="bg-rose-950/60 rounded-lg px-3 py-2">
+                <p class="text-xs text-rose-300 uppercase tracking-widest">Warmup</p>
+                <p class="text-2xl font-black text-rose-100">{whiteboard.warmupSec}s</p>
+              </div>
+            {/if}
+            {#if whiteboard.cooldownSec > 0}
+              <div class="bg-violet-950/60 rounded-lg px-3 py-2">
+                <p class="text-xs text-violet-300 uppercase tracking-widest">Cooldown</p>
+                <p class="text-2xl font-black text-violet-100">{whiteboard.cooldownSec}s</p>
+              </div>
+            {/if}
+          </div>
+
+          {#if whiteboard.coachNotes}
+            <div class="bg-amber-950/50 border border-amber-800/50 rounded-xl p-4">
+              <p class="text-xs text-amber-300 uppercase tracking-widest font-bold mb-2">Note coach</p>
+              <p class="text-lg text-amber-50 leading-snug">{whiteboard.coachNotes}</p>
+            </div>
+          {/if}
+
+          <div class="space-y-2">
+            <p class="text-xs text-slate-500 uppercase tracking-widest font-bold">Stations</p>
+            {#each whiteboard.stations as station}
+              <div class="bg-slate-800/50 rounded-lg px-3 py-2 flex items-center gap-3">
+                <span class="w-7 h-7 rounded-md bg-slate-700 text-sky-300 flex items-center justify-center text-xs font-black">
+                  {station.position}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm text-slate-200 truncate">
+                    {station.exerciseNames.join(' / ') || 'Station vide'}
+                  </p>
+                  {#if station.stationMode === 'REPS'}
+                    <p class="text-xs text-violet-300">{station.sets ?? 3} x {station.reps ?? 10} reps</p>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <div class="mt-auto px-5 py-4 border-t border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+            <span class="text-xs text-slate-400">Whiteboard pret. Demarrage automatique au lancement.</span>
           </div>
         </div>
 

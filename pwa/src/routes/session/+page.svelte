@@ -55,6 +55,11 @@
   };
 
   // ---- Commandes ----
+  $effect(() => {
+    if (!selectedCircuitId || session || !conn.connected) return;
+    conn.send({ type: 'PREVIEW_CIRCUIT', circuitId: selectedCircuitId });
+  });
+
   function startSession() {
     if (!selectedCircuitId) return;
     conn.send({ type: 'START', circuitId: selectedCircuitId });

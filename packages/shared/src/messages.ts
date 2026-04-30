@@ -45,6 +45,10 @@ export const StartCommand = z.object({
   type: z.literal('START'),
   circuitId: z.string().uuid(),
 });
+export const PreviewCircuitCommand = z.object({
+  type: z.literal('PREVIEW_CIRCUIT'),
+  circuitId: z.string().uuid(),
+});
 export const PauseCommand = z.object({ type: z.literal('PAUSE') });
 export const ResumeCommand = z.object({ type: z.literal('RESUME') });
 export const SkipCommand = z.object({ type: z.literal('SKIP') });
@@ -83,6 +87,7 @@ export const ClientMessage = z.discriminatedUnion('type', [
   ClockPingMsg,
   HeartbeatMsg,
   StartCommand,
+  PreviewCircuitCommand,
   PauseCommand,
   ResumeCommand,
   SkipCommand,
@@ -171,6 +176,29 @@ export const CircuitStateMsg = z.object({
   ),
 });
 
+export const WhiteboardStateMsg = z.object({
+  type: z.literal('WHITEBOARD_STATE'),
+  payload: z.object({
+    circuitId: z.string().uuid(),
+    name: z.string(),
+    description: z.string().nullable(),
+    coachNotes: z.string().nullable(),
+    warmupSec: z.number().int(),
+    cooldownSec: z.number().int(),
+    rounds: z.number().int(),
+    workSec: z.number().int(),
+    restSec: z.number().int(),
+    transitionSec: z.number().int(),
+    stations: z.array(z.object({
+      position: z.number().int(),
+      exerciseNames: z.array(z.string()),
+      stationMode: z.enum(['TIME', 'REPS']),
+      sets: z.number().int().nullable(),
+      reps: z.number().int().nullable(),
+    })),
+  }),
+});
+
 export const SessionEndedMsg = z.object({
   type: z.literal('SESSION_ENDED'),
   reason: z.enum(['completed', 'stopped', 'error']),
@@ -237,6 +265,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   SessionUpdateMsg,
   DisplayStateMsg,
   CircuitStateMsg,
+  WhiteboardStateMsg,
   SessionEndedMsg,
   ClientListMsg,
   SessionAutoStartedMsg,

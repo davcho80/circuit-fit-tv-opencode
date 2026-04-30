@@ -38,6 +38,26 @@ export interface SessionPayload {
   hydrationBreakEndsAt?: number | null;
 }
 
+export interface WhiteboardPayload {
+  circuitId: string;
+  name: string;
+  description: string | null;
+  coachNotes: string | null;
+  warmupSec: number;
+  cooldownSec: number;
+  rounds: number;
+  workSec: number;
+  restSec: number;
+  transitionSec: number;
+  stations: Array<{
+    position: number;
+    exerciseNames: string[];
+    stationMode: 'TIME' | 'REPS';
+    sets: number | null;
+    reps: number | null;
+  }>;
+}
+
 export interface ClientInfo {
   id:          string;
   role:        string;
@@ -60,6 +80,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
   let session = $state<SessionPayload | null>(null);
   let clockOffset = $state(0); // serverNow = Date.now() + clockOffset
   let clientList = $state<ClientInfo[]>([]);
+  let whiteboard = $state<WhiteboardPayload | null>(null);
   let sessionEndedReason = $state<string | null>(null);
   let schedulerFiredAt = $state<number | null>(null); // timestamp dernière session auto
 
@@ -126,6 +147,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
       }
       case 'SESSION_UPDATE':
         session = (msg['payload'] as SessionPayload | null) ?? null;
+        if (session) whiteboard = null;
         if (role === 'tv' && session) saveTvSessionSnapshot(session);
         if (session && !sessionEndedReason) {
           // Détection auto-start : session qui arrive sans que le coach ait envoyé START
@@ -152,6 +174,9 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
       case 'SESSION_ENDED':
         session = null;
         sessionEndedReason = (msg['reason'] as string) ?? 'stopped';
+        break;
+      case 'WHITEBOARD_STATE':
+        whiteboard = msg['payload'] as WhiteboardPayload;
         break;
       case 'CLIENT_LIST':
         clientList = (msg['payload'] as ClientInfo[]) ?? [];
@@ -200,6 +225,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
     get session()            { return session; },
     get clockOffset()        { return clockOffset; },
     get clientList()         { return clientList; },
+    get whiteboard()         { return whiteboard; },
     get sessionEndedReason()  { return sessionEndedReason; },
     get schedulerFiredAt()    { return schedulerFiredAt; },
     serverNow,

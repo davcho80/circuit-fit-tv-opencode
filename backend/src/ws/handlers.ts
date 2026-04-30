@@ -80,6 +80,53 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
         });
       break;
 
+    case 'PREVIEW_CIRCUIT':
+      if (client.role !== 'coach') {
+        hub.send(client, { type: 'ERROR', code: 'FORBIDDEN', message: 'Seul le coach peut préparer le whiteboard' });
+        break;
+      }
+      prisma.circuit.findUnique({
+        where: { id: msg.circuitId },
+        include: {
+          stations: {
+            orderBy: { position: 'asc' },
+            include: { exercises: { include: { exercise: true } } },
+          },
+        },
+      }).then((circuit) => {
+        if (!circuit) {
+          hub.send(client, { type: 'ERROR', code: 'CIRCUIT_NOT_FOUND', message: 'Circuit introuvable' });
+          return;
+        }
+        if (!circuit.whiteboardEnabled) return;
+        hub.broadcastToTvs({
+          type: 'WHITEBOARD_STATE',
+          payload: {
+            circuitId: circuit.id,
+            name: circuit.name,
+            description: circuit.description,
+            coachNotes: circuit.coachNotes,
+            warmupSec: circuit.warmupSec,
+            cooldownSec: circuit.cooldownSec,
+            rounds: circuit.rounds,
+            workSec: circuit.workSec,
+            restSec: circuit.restSec,
+            transitionSec: circuit.transitionSec,
+            stations: circuit.stations.map((station) => ({
+              position: station.position,
+              exerciseNames: station.exercises.map((entry) => entry.exercise.name),
+              stationMode: station.stationMode,
+              sets: station.sets,
+              reps: station.reps,
+            })),
+          },
+        });
+        auditWs(client, 'session.whiteboard.previewed.ws', null, { circuitId: msg.circuitId });
+      }).catch((err: unknown) => {
+        hub.send(client, { type: 'ERROR', code: 'PREVIEW_FAILED', message: String(err) });
+      });
+      break;
+
     case 'PAUSE':
       if (client.role !== 'coach') break;
       orchestrator.pause();
