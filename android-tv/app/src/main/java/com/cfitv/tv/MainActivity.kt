@@ -1,58 +1,45 @@
 package com.cfitv.tv
 
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import com.cfitv.tv.ui.SetupScreen
-import com.cfitv.tv.ui.TvScreen
-import com.cfitv.tv.ui.TvViewModel
+import android.view.View
+import android.view.WindowManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 
-class MainActivity : ComponentActivity() {
+class MainActivity : Activity() {
 
-    private val viewModel: TvViewModel by viewModels()
-
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
 
-        setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                val uiState by viewModel.uiState.collectAsState()
-
-                when (uiState.screen) {
-                    TvViewModel.UiState.Screen.SETUP -> SetupScreen(
-                        serverUrl             = uiState.serverUrl,
-                        label                 = uiState.label,
-                        stationNumber         = uiState.stationNumber,
-                        isLandscape           = uiState.isLandscape,
-                        screenType            = uiState.screenType,
-                        isDiscovering         = uiState.isDiscovering,
-                        isPairing             = uiState.isPairing,
-                        pairingPin            = uiState.pairingPin,
-                        pairingUrl            = uiState.pairingUrl,
-                        connected             = uiState.connected,
-                        onServerUrlChange     = viewModel::updateServerUrl,
-                        onLabelChange         = viewModel::updateLabel,
-                        onStationNumberChange = viewModel::updateStationNumber,
-                        onOrientationChange   = viewModel::updateIsLandscape,
-                        onScreenTypeChange    = viewModel::updateScreenType,
-                        onStartPairing        = viewModel::startPairing,
-                        onCancelPairing       = viewModel::cancelPairing,
-                        onRetryDiscovery      = viewModel::startMdnsDiscovery,
-                        onConnect             = viewModel::connect,
-                    )
-                    TvViewModel.UiState.Screen.DISPLAY -> TvScreen(
-                        uiState      = uiState,
-                        onDisconnect = viewModel::disconnect,
-                    )
-                }
+        val webView = WebView(this)
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                return false
             }
         }
+        webView.webChromeClient = WebChromeClient()
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.databaseEnabled = true
+        webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.settings.cacheMode = WebSettings.LOAD_DEFAULT
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+
+        setContentView(webView)
+        webView.loadUrl(BuildConfig.CFITV_TV_URL)
     }
 }

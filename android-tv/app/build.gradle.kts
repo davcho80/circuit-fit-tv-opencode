@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -15,6 +13,11 @@ android {
         targetSdk       = 35
         versionCode     = 1
         versionName     = "1.0"
+        buildConfigField(
+            "String",
+            "CFITV_TV_URL",
+            "\"${providers.gradleProperty("cfitvTvUrl").getOrElse("http://10.0.2.2:3000/tv")}\"",
+        )
     }
 
     buildTypes {
@@ -31,24 +34,9 @@ android {
 
     kotlinOptions { jvmTarget = "11" }
 
-    buildFeatures { compose = true }
+    buildFeatures { buildConfig = true }
 }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.material3)
-    implementation(libs.media3.exoplayer)
-    implementation(libs.media3.ui)
-    implementation(libs.okhttp)
-    implementation(libs.zxing.core)
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.serialization.json)
-    debugImplementation(libs.compose.ui.tooling)
 }
