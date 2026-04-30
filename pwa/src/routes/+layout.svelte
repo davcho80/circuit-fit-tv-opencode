@@ -7,6 +7,11 @@
   import { t, setLocale, getLocale } from '$lib/i18n.svelte.js';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
 
+  interface BeforeInstallPromptEvent extends Event {
+    prompt(): Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+  }
+
   let { children } = $props();
 
   const isTv       = $derived($page.url.pathname.startsWith('/tv'));
@@ -24,6 +29,8 @@
 
   // Menu utilisateur
   let menuOpen = $state(false);
+  let installPrompt = $state<BeforeInstallPromptEvent | null>(null);
+  let isStandalone = $state(false);
   function toggleMenu() { menuOpen = !menuOpen; }
   function closeMenu()  { menuOpen = false; }
 
@@ -54,6 +61,40 @@
   // Switcher de langue
   function toggleLocale() {
     setLocale(getLocale() === 'fr' ? 'en' : 'fr');
+  }
+
+  onMount(() => {
+    isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || ('standalone' in navigator && navigator.standalone === true);
+
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      installPrompt = event as BeforeInstallPromptEvent;
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    };
+  });
+
+  async function installApp() {
+    if (!installPrompt) return;
+    const prompt = installPrompt;
+    installPrompt = null;
+    await prompt.prompt();
+    await prompt.userChoice.catch(() => undefined);
+  }
+
+  function sessionLabel(): string {
+    const expiresAt = authStore.expiresAt;
+    if (!expiresAt) return 'Session persistante';
+    const remainingMs = expiresAt - Date.now();
+    if (remainingMs <= 0) return 'Session expirée';
+    const minutes = Math.ceil(remainingMs / 60_000);
+    if (minutes < 60) return `Session encore ${minutes} min`;
+    const hours = Math.ceil(minutes / 60);
+    return `Session encore ${hours} h`;
   }
 
   const nav = $derived([
@@ -118,6 +159,18 @@
       <div class="flex items-center gap-1 px-3 py-2 shrink-0">
 
         <!-- Switcher langue -->
+        {#if installPrompt && !isStandalone}
+          <button
+            onclick={installApp}
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-emerald-300 hover:text-emerald-200
+                   hover:bg-emerald-950/40 transition-colors text-sm font-medium"
+            title="Installer Circuit Fit TV"
+          >
+            <span>⬇</span>
+            <span class="hidden md:inline">Installer</span>
+          </button>
+        {/if}
+
         <button
           onclick={toggleLocale}
           class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200
@@ -167,6 +220,7 @@
                       <p class="text-xs {roleColor[authStore.user.role] ?? 'text-slate-400'} mt-0.5">
                         {t(authStore.user.role === 'ADMIN' ? 'common.admin' : 'common.coach')}
                       </p>
+                      <p class="text-xs text-slate-500 mt-0.5">{sessionLabel()}</p>
                     </div>
                   </div>
                 </div>
