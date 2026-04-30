@@ -17,6 +17,15 @@ Le service `migrate` applique automatiquement `prisma migrate deploy` avant le d
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate
 ```
 
+Verification sante apres demarrage:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
+curl http://<SERVER_LAN_IP>:3000/health
+```
+
+La duree de session coach/admin est controlee par `JWT_EXPIRES_IN` dans `.env.production`. Garder une duree courte si la tablette est partagee, et documenter la valeur choisie pour le gym.
+
 ## Ports et firewall
 
 | Port | Exposition | Usage |
