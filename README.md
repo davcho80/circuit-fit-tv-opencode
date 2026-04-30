@@ -6,7 +6,7 @@ Une tablette pilote plusieurs écrans Android TV répartis dans un espace d'entr
 
 ## Statut
 
-**Prototype V1 fonctionnel** — Sprints 0 à 8 complétés
+**Prototype V1 fonctionnel** — base coach/TV/admin/deploiement operationnelle
 
 | Sprint | Fonctionnalité | Statut |
 |--------|---------------|--------|
@@ -19,6 +19,11 @@ Une tablette pilote plusieurs écrans Android TV répartis dans un espace d'entr
 | Sprint 6 | Hydratation (pauses manuelles + programmées, overlay bouteille) | ✅ Complété |
 | Sprint 7 | Calendrier (cédules récurrentes, démarrage automatique sessions) | ✅ Complété |
 | Sprint 8 | Gestion des écrans (liste, modification rôle/station, suppression) | ✅ Complété |
+| Stabilisation | Qualité locale : typecheck, lint, build, ESLint strict | ✅ Complété |
+| Admin | Console admin unifiée : studio, écrans, users, diagnostics, update | ✅ Complété |
+| Sécurité | JWT WebSocket coach, secret TV pairé, secrets prod obligatoires | ✅ En cours |
+| Déploiement | Docker production LAN, mDNS, migrations, backups PostgreSQL | ✅ En cours |
+| Circuit V2 | Warmup/cooldown, whiteboard, notes coach, modèle enrichi | À faire |
 
 ## Fonctionnalités
 
@@ -28,13 +33,23 @@ Une tablette pilote plusieurs écrans Android TV répartis dans un espace d'entr
 - Déclencher une pause hydratation manuelle (30s / 1 min / 2 min)
 - Visualiser les écrans connectés et les gérer
 - Planifier des sessions récurrentes (calendrier hebdomadaire)
+- Installer la console comme PWA et conserver une session coach limitée dans le temps
 
-### TV Station (Android)
+### Console admin
+- Gérer le branding studio, le logo, la couleur principale et le fuseau horaire
+- Appairer les TV par PIN/QR et configurer les rôles `STATION`, `CENTRAL`, `SCHEDULE`
+- Gérer les comptes admin/coach avec protection du dernier admin
+- Lire les diagnostics système : DB, stockage, scheduler, WebSocket, écrans online/offline
+- Consulter les derniers événements d'audit admin
+- Lancer une mise à jour système si `UPDATE_SCRIPT_PATH` est configuré
+
+### TV Station (Android / PWA)
 - Affichage de l'exercice courant avec timer
 - Synchronisation temps réel via WebSocket
 - Overlay pause hydratation avec countdown et icône bouteille
 - Appairage automatique via code PIN ou QR code
 - Reconnexion automatique au redémarrage
+- Reconnexion sécurisée par `displayId` + secret TV généré au pairing
 
 ### TV Centrale (Android / PWA)
 - Carte de toutes les stations avec indicateur actif/transition
@@ -42,11 +57,18 @@ Une tablette pilote plusieurs écrans Android TV répartis dans un espace d'entr
 - Timer global et progression (round courant / total)
 - Overlay hydratation synchronisé
 
+### TV Calendrier (PWA / Android)
+- Affichage plein écran des cours planifiés
+- Lecture publique via route TV dédiée
+- Rôle écran `SCHEDULE` supporté côté Prisma, API, PWA et Android
+
 ### Backend
 - Scheduler automatique : démarre une session à l'heure planifiée (30s polling, protection double-fire)
-- WebSocket hub avec rôles (coach / tv / monitor)
-- REST API complète : exercices, circuits, sessions, displays, schedules
+- WebSocket hub avec rôles (coach / tv / monitor) et authentification JWT pour coach/monitor
+- REST API complète : exercices, circuits, sessions, displays, schedules, diagnostics, audit
 - Gestion des fuseaux horaires via `Intl.DateTimeFormat`
+- Secrets obligatoires en production (`JWT_SECRET`, secrets S3)
+- Audit persistant des actions critiques : login, pairing TV, sessions, users, settings, displays, update
 
 ## Architecture
 
@@ -55,13 +77,13 @@ circuit-fit-tv/
 ├── backend/           Serveur Node.js + Fastify + WebSocket
 │   ├── prisma/        Schéma PostgreSQL + migrations
 │   └── src/
-│       ├── routes/    REST : exercises, circuits, displays, sessions, schedules, pair
+│       ├── routes/    REST : exercises, circuits, displays, sessions, schedules, pair, diagnostics
 │       ├── sessions/  Orchestrateur live + scheduler automatique
 │       └── ws/        Hub WebSocket + handlers + appairage
 ├── pwa/               App tablette — SvelteKit PWA (Svelte 5 runes + Tailwind v4)
 │   └── src/
 │       ├── lib/       CircuitBuilder, LayoutEditor, api.ts, ws.svelte.ts
-│       └── routes/    circuits/, session/, schedule/, screens/, tv/, tv/central/
+│       └── routes/    admin/, circuits/, session/, schedule/, tv/, tv/central/, tv/schedule/
 ├── android-tv/        App Android TV — Kotlin + Jetpack Compose
 │   └── src/
 │       ├── ui/        TvScreen, TvViewModel, SetupScreen, QrCode
@@ -103,7 +125,7 @@ cp .env.example .env   # ajuster si besoin
 npm run services:up
 
 # Migration DB + génération Prisma client
-cd backend && npx prisma migrate deploy
+npm run db:migrate --workspace=@cfitv/backend
 ```
 
 ### Lancer en dev
@@ -139,6 +161,12 @@ npm run build
 
 Ces commandes couvrent les workspaces backend, PWA et packages partagés sans relâcher la configuration TypeScript stricte.
 
+Si une erreur Prisma indique qu'une colonne manque dans la base locale, relancer :
+
+```bash
+npm run db:migrate --workspace=@cfitv/backend
+```
+
 ### Installation PWA et session coach
 
 La console coach est installable comme PWA sur les navigateurs qui supportent le manifest web et le service worker :
@@ -157,6 +185,21 @@ Ouvrir `android-tv/` dans Android Studio et lancer sur un émulateur TV ou appar
 - [Spécification technique complète](docs/spec.docx)
 - [Architecture Decision Records](docs/adr/)
 - [Déploiement production locale](docs/deployment.md)
+
+## Production locale
+
+Le déploiement gym utilise `docker-compose.prod.yml` avec backend en `network_mode: host` pour publier `_cfitv._tcp` en mDNS sur le LAN. PostgreSQL, Redis et la console MinIO restent limités à `127.0.0.1`; les médias MinIO et le backend sont exposés au LAN.
+
+Commandes principales :
+
+```bash
+cp .env.production.example .env.production
+npm run prod:up
+npm run prod:logs
+npm run prod:backup
+```
+
+Les migrations sont appliquées par le service `migrate` avant le démarrage backend. Les backups PostgreSQL automatisés sont disponibles avec le profil Docker `backup`.
 
 ## Licence
 
