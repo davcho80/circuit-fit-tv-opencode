@@ -13,6 +13,5 @@ coverage
 !.env.example
 prototypes
 android
-pwa
 docs
 *.md

@@ -128,6 +128,7 @@ coverage/
 # ----- Docker / déploiement local -----
 docker-compose.override.yml
 .docker/
+backups/
 
 # ----- Context de développement -----
 .claude/

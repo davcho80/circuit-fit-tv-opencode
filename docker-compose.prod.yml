@@ -1,0 +1,164 @@
+# ============================================================
+# Circuit Fit TV — déploiement production locale gym
+# ------------------------------------------------------------
+# Backend en network_mode: host pour publier _cfitv._tcp en mDNS
+# sur le LAN. PostgreSQL/MinIO/Redis restent conteneurisés et
+# exposés sur 127.0.0.1, sauf MinIO API qui doit rester joignable
+# par les navigateurs/TV pour les médias.
+#
+# Usage:
+#   cp .env.production.example .env.production
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfitv-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cfitv}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-cfitv}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cfitv} -d ${POSTGRES_DB:-cfitv}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: cfitv-prod-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-cfitv_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    ports:
+      - "${SERVER_LAN_IP:-0.0.0.0}:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: cfitv-prod-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-cfitv_admin} ${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing local/${S3_BUCKET_VIDEOS:-videos};
+      mc mb --ignore-existing local/${S3_BUCKET_THUMBNAILS:-thumbnails};
+      mc anonymous set download local/${S3_BUCKET_VIDEOS:-videos};
+      mc anonymous set download local/${S3_BUCKET_THUMBNAILS:-thumbnails};
+      echo 'MinIO buckets ready.';
+      "
+
+  redis:
+    image: redis:7-alpine
+    container_name: cfitv-prod-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: build
+    image: cfitv/backend-migrate:local-prod
+    container_name: cfitv-prod-migrate
+    network_mode: host
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    command: ["npm", "run", "db:migrate:prod", "--workspace=@cfitv/backend"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: cfitv/backend:local-prod
+    container_name: cfitv-prod-backend
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      NODE_ENV: production
+      BACKEND_HOST: ${BACKEND_HOST:-0.0.0.0}
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MDNS_ENABLED: ${MDNS_ENABLED:-true}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://127.0.0.1:6379}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:?S3_ENDPOINT is required}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-cfitv_admin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET_VIDEOS: ${S3_BUCKET_VIDEOS:-videos}
+      S3_BUCKET_THUMBNAILS: ${S3_BUCKET_THUMBNAILS:-thumbnails}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: cfitv-prod-postgres-backup
+    restart: unless-stopped
+    network_mode: host
+    profiles: ["backup"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_USER: ${POSTGRES_USER:-cfitv}
+      POSTGRES_DB: ${POSTGRES_DB:-cfitv}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups/postgres:/backups
+    entrypoint: >
+      /bin/sh -c '
+      while true; do
+        file="/backups/cfitv-$$(date +%Y%m%d-%H%M%S).dump";
+        pg_dump -h 127.0.0.1 -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -Fc > "$$file";
+        find /backups -type f -name "cfitv-*.dump" -mtime +"$$BACKUP_RETENTION_DAYS" -delete;
+        echo "Backup written: $$file";
+        sleep "$$BACKUP_INTERVAL_SECONDS";
+      done
+      '
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:
+  redis_data:

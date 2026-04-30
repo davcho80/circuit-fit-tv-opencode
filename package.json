@@ -17,7 +17,11 @@
     "services:up": "docker compose up -d",
     "services:down": "docker compose down",
     "services:reset": "docker compose down -v && docker compose up -d",
-    "services:logs": "docker compose logs -f"
+    "services:logs": "docker compose logs -f",
+    "prod:up": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d",
+    "prod:down": "docker compose -f docker-compose.prod.yml --env-file .env.production down",
+    "prod:logs": "docker compose -f docker-compose.prod.yml --env-file .env.production logs -f",
+    "prod:backup": "docker compose -f docker-compose.prod.yml --env-file .env.production run --rm postgres-backup sh -lc 'pg_dump -h 127.0.0.1 -p ${POSTGRES_PORT:-5432} -U ${POSTGRES_USER:-cfitv} -d ${POSTGRES_DB:-cfitv} -Fc > /backups/manual-$(date +%Y%m%d-%H%M%S).dump'"
   },
   "engines": {
     "node": ">=20.0.0",

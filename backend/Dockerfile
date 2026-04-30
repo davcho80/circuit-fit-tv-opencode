@@ -9,6 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY backend/package.json ./backend/
+COPY pwa/package.json ./pwa/
 
 RUN npm ci --workspaces --include-workspace-root
 
@@ -21,8 +22,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY packages/shared ./packages/shared
 COPY backend ./backend
+COPY pwa ./pwa
 
-RUN npm run build --workspace=@cfitv/backend
+RUN npm run db:generate --workspace=@cfitv/backend && \
+    npm run build
 
 # ---------- Stage 3 : runtime ----------
 FROM node:20-alpine AS runtime
@@ -34,13 +37,16 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 COPY --chown=nodejs:nodejs package.json package-lock.json ./
 COPY --chown=nodejs:nodejs packages/shared/package.json ./packages/shared/
 COPY --chown=nodejs:nodejs backend/package.json ./backend/
+COPY --chown=nodejs:nodejs pwa/package.json ./pwa/
 
 RUN npm ci --workspaces --include-workspace-root --omit=dev && \
     npm cache clean --force && \
     chown -R nodejs:nodejs /app/node_modules
 
 COPY --from=build --chown=nodejs:nodejs /app/backend/dist ./backend/dist
+COPY --from=build --chown=nodejs:nodejs /app/backend/src/generated ./backend/dist/generated
 COPY --from=build --chown=nodejs:nodejs /app/packages/shared/src ./packages/shared/src
+COPY --from=build --chown=nodejs:nodejs /app/pwa/build ./pwa/build
 
 USER nodejs
 EXPOSE 3000
