@@ -146,7 +146,7 @@ La console coach est installable comme PWA sur les navigateurs qui supportent le
 - Chrome / Edge sur Android, ChromeOS, Windows, macOS et Linux : prompt d'installation intégré quand le navigateur expose `beforeinstallprompt`.
 - Safari iOS/iPadOS : installation via le menu de partage, puis "Ajouter à l'écran d'accueil".
 
-La session coach est conservée dans le navigateur via le JWT stocké en `localStorage`. La politique actuelle du backend signe les tokens pour 8 heures ; l'interface affiche l'échéance dans le menu utilisateur et supprime automatiquement le token expiré. Les routes TV (`/tv`, `/pair`) restent publiques et n'envoient pas de session coach aux WebSocket TV.
+La session coach est conservée dans le navigateur via le JWT stocké en `localStorage`. La politique par défaut du backend signe les tokens pour 8 heures et peut être ajustée avec `JWT_EXPIRES_IN` ; l'interface affiche l'échéance dans le menu utilisateur et supprime automatiquement le token expiré. Les routes TV (`/tv`, `/pair`) restent publiques et n'envoient pas de session coach aux WebSocket TV.
 
 ### App Android TV
 

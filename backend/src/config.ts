@@ -48,6 +48,7 @@ export const config = {
   },
 
   jwtSecret: secretInProduction('JWT_SECRET', 'cfitv_dev_jwt_secret_change_in_production_32c', 32),
+  jwtExpiresIn: optional('JWT_EXPIRES_IN', '8h'),
 
   adminEmail:           optional('ADMIN_EMAIL', ''),
   adminInitialPassword: optional('ADMIN_INITIAL_PASSWORD', ''),

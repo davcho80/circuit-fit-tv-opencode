@@ -26,7 +26,7 @@ declare module '@fastify/jwt' {
 export const jwtFastifyPlugin = fp(async (app: FastifyInstance) => {
   await app.register(jwtPlugin, {
     secret: config.jwtSecret,
-    sign:   { expiresIn: '8h' },
+    sign:   { expiresIn: config.jwtExpiresIn },
   });
 });
 
