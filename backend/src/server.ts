@@ -14,7 +14,7 @@ import multipart from '@fastify/multipart';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
@@ -58,6 +58,24 @@ const loggerConfig: FastifyServerOptions['logger'] = config.isDev
   : { level: config.logLevel };
 
 const app = Fastify({ logger: loggerConfig });
+
+function hashTvSecret(secret: string): string {
+  return createHash('sha256').update(secret).digest('hex');
+}
+
+async function verifyTvSecret(displayId: string, tvSecret: string | undefined): Promise<boolean> {
+  const display = await prisma.display.findUnique({
+    where:  { id: displayId },
+    select: { tvSecretHash: true },
+  });
+  if (!display) return false;
+  if (!display.tvSecretHash) return true;
+  if (!tvSecret) return false;
+
+  const expected = Buffer.from(display.tvSecretHash, 'hex');
+  const actual = Buffer.from(hashTvSecret(tvSecret), 'hex');
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
 
 // ---- Plugins ----
 
@@ -295,7 +313,7 @@ app.get('/ws', { websocket: true }, (socket, _req) => {
 
   let client = hub.add(socket, 'monitor', `unregistered-${tempId}`);
 
-  socket.on('message', (raw: Buffer | string) => {
+  socket.on('message', async (raw: Buffer | string) => {
     const str = typeof raw === 'string' ? raw : raw.toString('utf8');
 
     // Premier message : REGISTER attendu
@@ -308,7 +326,7 @@ app.get('/ws', { websocket: true }, (socket, _req) => {
       const register = RegisterMsg.safeParse(parsed);
       if (!register.success) { socket.close(4003, 'Expected REGISTER'); return; }
 
-      const { role, label, displayId, authToken } = register.data;
+      const { role, label, displayId, tvSecret, authToken } = register.data;
       let authenticatedUser: JwtUser | null = null;
 
       if (role === 'coach' || role === 'monitor') {
@@ -323,6 +341,14 @@ app.get('/ws', { websocket: true }, (socket, _req) => {
 
         if (authenticatedUser.role !== 'ADMIN' && authenticatedUser.role !== 'COACH') {
           socket.close(4403, 'Forbidden');
+          return;
+        }
+      }
+
+      if (role === 'tv' && displayId) {
+        const tvAllowed = await verifyTvSecret(displayId, tvSecret);
+        if (!tvAllowed) {
+          socket.close(4403, 'Invalid TV secret');
           return;
         }
       }

@@ -24,6 +24,7 @@ export const RegisterMsg = z.object({
   role: z.enum(['tv', 'coach', 'monitor']),
   label: z.string().min(1).max(50),
   displayId: z.string().uuid().optional(), // null si TV pas encore appairée
+  tvSecret: z.string().min(32).optional(), // secret d'appareil requis pour une TV déjà appairée
   authToken: z.string().min(1).optional(), // JWT requis pour les clients coach/monitor
 });
 
@@ -224,6 +225,7 @@ export const PairConfigMsg = z.object({
   stationNumber: z.number().int().min(1).max(20),
   screenType:   z.enum(['STATION', 'DASHBOARD', 'CENTRAL', 'SCHEDULE']),
   isLandscape:  z.boolean(),
+  tvSecret:     z.string().min(32),
   primaryColor: z.string().optional(),
   logoUrl:      z.string().nullable().optional(),
 });

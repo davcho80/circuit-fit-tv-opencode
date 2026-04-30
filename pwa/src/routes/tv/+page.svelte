@@ -59,7 +59,10 @@
       return;
     }
     conn?.destroy();
-    conn = createWsConnection('tv', label, savedConfig?.mode === 'station' ? { displayId: savedConfig.displayId } : {});
+    conn = createWsConnection('tv', label, savedConfig?.mode === 'station' ? {
+      displayId: savedConfig.displayId,
+      tvSecret: savedConfig.tvSecret,
+    } : {});
   }
 
   function handlePairConfig(payload: PairConfigPayload) {
@@ -76,7 +79,10 @@
     }
 
     conn?.destroy();
-    conn = createWsConnection('tv', config.label, { displayId: config.displayId });
+    conn = createWsConnection('tv', config.label, {
+      displayId: config.displayId,
+      tvSecret: config.tvSecret,
+    });
   }
 
   function startPairing() {

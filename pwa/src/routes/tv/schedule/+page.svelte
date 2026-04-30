@@ -59,7 +59,10 @@
     const config = loadTvConfig();
     if (config?.mode === 'schedule') {
       savedConfig = config;
-      conn = createWsConnection('tv', config.label, { displayId: config.displayId });
+      conn = createWsConnection('tv', config.label, {
+        displayId: config.displayId,
+        tvSecret: config.tvSecret,
+      });
     }
     applyBranding();
   });

@@ -35,15 +35,27 @@ const DisplayRegister = z.object({
     .optional(),
 });
 
+const displayPublicSelect = {
+  id:            true,
+  name:          true,
+  role:          true,
+  stationNumber: true,
+  lastSeen:      true,
+  deviceModel:   true,
+  deviceOs:      true,
+  appVersion:    true,
+  pairedAt:      true,
+} as const;
+
 export async function displaysRoutes(app: FastifyInstance): Promise<void> {
   // GET /displays
   app.get('/displays', async () => {
-    return prisma.display.findMany({ orderBy: { pairedAt: 'asc' } });
+    return prisma.display.findMany({ orderBy: { pairedAt: 'asc' }, select: displayPublicSelect });
   });
 
   // GET /displays/:id
   app.get<{ Params: { id: string } }>('/displays/:id', async (req, reply) => {
-    const display = await prisma.display.findUnique({ where: { id: req.params.id } });
+    const display = await prisma.display.findUnique({ where: { id: req.params.id }, select: displayPublicSelect });
     if (!display) return reply.code(404).send({ error: 'Display not found' });
     return display;
   });
@@ -61,6 +73,7 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
         appVersion: body.data.deviceInfo?.appVersion ?? null,
         pairedAt: new Date(),
       },
+      select: displayPublicSelect,
     });
     return reply.code(201).send(display);
   });
@@ -73,7 +86,11 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
     const body = DisplayPatch.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
-    const updated = await prisma.display.update({ where: { id: req.params.id }, data: stripUndefined(body.data) });
+    const updated = await prisma.display.update({
+      where:  { id: req.params.id },
+      data:   stripUndefined(body.data),
+      select: displayPublicSelect,
+    });
     return updated;
   });
 

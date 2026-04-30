@@ -134,6 +134,7 @@ data class PairConfig(
     val stationNumber: Int,
     val screenType: String,       // "STATION" | "DASHBOARD" | "CENTRAL" | "SCHEDULE"
     val isLandscape: Boolean,
+    val tvSecret: String? = null,
     val primaryColor: String? = null,
     val logoUrl: String? = null,
 ) : ServerMessage()
@@ -168,6 +169,7 @@ sealed class ClientMessage {
         val role: String,
         val label: String,
         val displayId: String? = null,
+        val tvSecret: String? = null,
     ) : ClientMessage()
 
     @Serializable @SerialName("CLOCK_PING")

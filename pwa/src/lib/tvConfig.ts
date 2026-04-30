@@ -7,6 +7,7 @@ export interface PairConfigPayload {
   stationNumber: number;
   screenType: PairScreenType;
   isLandscape: boolean;
+  tvSecret: string;
   primaryColor?: string | null;
   logoUrl?: string | null;
 }
@@ -18,6 +19,7 @@ export interface TvConfig {
   screenType: 'STATION' | 'CENTRAL' | 'SCHEDULE';
   mode: TvMode;
   isLandscape: boolean;
+  tvSecret: string;
   primaryColor: string | null;
   logoUrl: string | null;
   savedAt: number;
@@ -56,6 +58,7 @@ function isTvConfig(value: unknown): value is TvConfig {
     (cfg.screenType === 'STATION' || cfg.screenType === 'CENTRAL' || cfg.screenType === 'SCHEDULE') &&
     (cfg.mode === 'station' || cfg.mode === 'central' || cfg.mode === 'schedule') &&
     typeof cfg.isLandscape === 'boolean' &&
+    typeof cfg.tvSecret === 'string' &&
     typeof cfg.savedAt === 'number'
   );
 }
@@ -68,6 +71,7 @@ export function saveTvConfig(payload: PairConfigPayload): TvConfig {
     screenType: normalizedScreenType(payload.screenType),
     mode: modeFor(payload.screenType),
     isLandscape: payload.isLandscape,
+    tvSecret: payload.tvSecret,
     primaryColor: payload.primaryColor ?? null,
     logoUrl: payload.logoUrl ?? null,
     savedAt: Date.now(),

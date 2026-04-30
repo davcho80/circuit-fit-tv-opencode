@@ -167,6 +167,7 @@ model Display {
   deviceModel   String?
   deviceOs      String?
   appVersion    String?
+  tvSecretHash  String?     @db.VarChar(64)
   pairedAt      DateTime?
 }
 

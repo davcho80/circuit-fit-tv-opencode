@@ -23,7 +23,10 @@
 
   function start() {
     conn?.destroy();
-    conn = createWsConnection('tv', label, savedConfig ? { displayId: savedConfig.displayId } : {});
+    conn = createWsConnection('tv', label, savedConfig ? {
+      displayId: savedConfig.displayId,
+      tvSecret: savedConfig.tvSecret,
+    } : {});
   }
   onDestroy(() => conn?.destroy());
 

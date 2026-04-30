@@ -1,0 +1,1 @@
+ALTER TABLE "Display" ADD COLUMN "tvSecretHash" VARCHAR(64);

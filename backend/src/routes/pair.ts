@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { FastifyInstance } from 'fastify';
+import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { hub } from '../ws/hub.js';
 import { claimPinWithInfo, getPendingPairs } from '../ws/pair.js';
@@ -26,6 +27,14 @@ function displayRoleFor(screenType: PairScreenType): 'STATION' | 'CENTRAL' | 'SC
   if (screenType === 'STATION') return 'STATION';
   if (screenType === 'SCHEDULE') return 'SCHEDULE';
   return 'CENTRAL';
+}
+
+function createTvSecret(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+function hashTvSecret(secret: string): string {
+  return createHash('sha256').update(secret).digest('hex');
 }
 
 export async function pairRoutes(app: FastifyInstance): Promise<void> {
@@ -52,6 +61,7 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
 
     // Créer l'enregistrement Display en DB
     const role = displayRoleFor(body.data.screenType);
+    const tvSecret = createTvSecret();
 
     const display = await prisma.display.create({
       data: {
@@ -61,6 +71,7 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
         deviceModel:   deviceModel ?? null,
         deviceOs:      deviceOs    ?? null,
         appVersion:    appVersion  ?? null,
+        tvSecretHash:  hashTvSecret(tvSecret),
         pairedAt:      new Date(),
         lastSeen:      new Date(),
       },
@@ -76,6 +87,7 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
       stationNumber: body.data.stationNumber,
       screenType:    body.data.screenType,
       isLandscape:   body.data.isLandscape,
+      tvSecret,
       primaryColor:  studio?.primaryColor ?? '#0ea5e9',
       logoUrl:       studio?.logoUrl ?? null,
     });

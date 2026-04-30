@@ -29,12 +29,14 @@ test('saveTvConfig persists a normalized paired TV config', () => {
     stationNumber: 1,
     screenType: 'DASHBOARD',
     isLandscape: true,
+    tvSecret: 'tv_secret_123',
     primaryColor: '#0ea5e9',
     logoUrl: null,
   });
 
   assert.equal(saved.screenType, 'CENTRAL');
   assert.equal(saved.mode, 'central');
+  assert.equal(saved.tvSecret, 'tv_secret_123');
   assert.equal(loadTvConfig()?.displayId, '9a3a9264-9e16-4a87-b3a9-cc0f2589f4e1');
   assert.equal(screenRouteFor(saved), '/tv/central');
 });
@@ -56,6 +58,7 @@ test('clearTvConfig removes the saved config', () => {
     screenType: 'STATION',
     mode: 'station',
     isLandscape: false,
+    tvSecret: 'tv_secret_456',
     primaryColor: null,
     logoUrl: null,
     savedAt: 1,

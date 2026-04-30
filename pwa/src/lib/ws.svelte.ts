@@ -49,6 +49,7 @@ export interface ClientInfo {
 
 export interface WsConnectionOptions {
   displayId?: string;
+  tvSecret?: string;
   onPairConfig?: (config: PairConfigPayload) => void;
 }
 
@@ -77,6 +78,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
 
       const registerMsg: Record<string, unknown> = { type: 'REGISTER', role, label };
       if (options.displayId) registerMsg['displayId'] = options.displayId;
+      if (options.tvSecret) registerMsg['tvSecret'] = options.tvSecret;
       const authToken = getWsAuthToken(role);
       if (authToken) registerMsg['authToken'] = authToken;
       ws!.send(JSON.stringify(registerMsg));
@@ -140,6 +142,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
           stationNumber: msg['stationNumber'] as number,
           screenType: msg['screenType'] as PairConfigPayload['screenType'],
           isLandscape: msg['isLandscape'] as boolean,
+          tvSecret: msg['tvSecret'] as string,
           primaryColor: (msg['primaryColor'] as string | undefined) ?? null,
           logoUrl: (msg['logoUrl'] as string | null | undefined) ?? null,
         });
