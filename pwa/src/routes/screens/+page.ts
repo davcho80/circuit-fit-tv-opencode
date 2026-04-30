@@ -1,15 +1,6 @@
-import { displays, type Display } from '$lib/api.js';
+import { redirect } from '@sveltejs/kit';
 
-const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
-
-export async function load({ fetch }: { fetch: typeof globalThis.fetch }) {
-  const [displayList, onlineRes] = await Promise.all([
-    displays.list(fetch),
-    fetch(`${BASE}/displays/online`).then((r) => r.json() as Promise<{ onlineIds: string[] }>).catch(() => ({ onlineIds: [] })),
-  ]);
-
-  return {
-    displays: displayList,
-    onlineIds: new Set<string>(onlineRes.onlineIds),
-  };
+export function load({ url }: { url: URL }) {
+  const pin = url.searchParams.get('pin');
+  redirect(307, `/admin?tab=screens${pin ? `&pin=${encodeURIComponent(pin)}` : ''}`);
 }
