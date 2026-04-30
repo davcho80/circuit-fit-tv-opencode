@@ -19,6 +19,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { Bonjour } from 'bonjour-service';
+import { RegisterMsg } from '@cfitv/shared';
+import type { ServerMessage } from '@cfitv/shared';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 // En production le build PWA est dans ../pwa/build (relatif au dist/)
@@ -26,9 +28,8 @@ const PWA_BUILD = join(__dirname, '..', '..', 'pwa', 'build');
 
 import { config } from './config.js';
 import { prisma } from './db.js';
-import { ensureBuckets } from './storage.js';
+import { checkStorageBuckets, ensureBuckets } from './storage.js';
 import { hub } from './ws/hub.js';
-import type { ClientRole } from './ws/hub.js';
 import { handleMessage } from './ws/handlers.js';
 import { orchestrator } from './sessions/orchestrator.js';
 import { exercisesRoutes } from './routes/exercises.js';
@@ -44,7 +45,8 @@ import { setupRoutes } from './routes/setup.js';
 import { settingsRoutes } from './routes/settings.js';
 import { tvScheduleRoutes } from './routes/tv-schedule.js';
 import { updateRoutes }     from './routes/update.js';
-import { jwtFastifyPlugin, requireAuth } from './auth/jwt.plugin.js';
+import { jwtFastifyPlugin, requireAdmin, requireAuth } from './auth/jwt.plugin.js';
+import type { JwtUser } from './auth/jwt.plugin.js';
 import { bootstrapAdmin } from './auth/bootstrap.js';
 import { startScheduler } from './sessions/scheduler.js';
 import { removeByClient } from './ws/pair.js';
@@ -93,6 +95,7 @@ const PUBLIC_API_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/tv-schedule
 const PROTECTED_PREFIXES  = [
   '/exercises', '/circuits', '/displays', '/sessions',
   '/schedules', '/stats', '/users', '/settings', '/update',
+  '/diagnostics',
 ];
 
 app.addHook('onRequest', async (req, reply) => {
@@ -142,24 +145,119 @@ if (!config.isDev && existsSync(PWA_BUILD)) {
 
 // ---- Routes REST ----
 
+async function checkDatabase(): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return { ok: true, error: null };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'unknown error',
+    };
+  }
+}
+
 app.get('/health', async () => {
-  // Vérifier DB
-  let dbOk = false;
-  try { await prisma.$queryRaw`SELECT 1`; dbOk = true; } catch { /* db down */ }
+  const [db, storage] = await Promise.all([
+    checkDatabase(),
+    checkStorageBuckets(),
+  ]);
 
   const clients = hub.all();
+  const activeSession = orchestrator.getState();
+  const degraded = !db.ok || !storage.ok;
+
   return {
-    status:  dbOk ? 'ok' : 'degraded',
+    status:  degraded ? 'degraded' : 'ok',
     service: 'circuit-fit-tv-backend',
     version: process.env['APP_VERSION'] ?? '0.1.0',
     time:    new Date().toISOString(),
-    db:      dbOk ? 'ok' : 'error',
+    db:      db.ok ? 'ok' : 'error',
+    storage: {
+      status: storage.ok ? 'ok' : 'error',
+      buckets: storage.buckets.map((bucket) => ({
+        name: bucket.name,
+        status: bucket.ok ? 'ok' : 'error',
+      })),
+    },
     ws: {
       total:   clients.length,
       coaches: clients.filter((c) => c.role === 'coach').length,
       tvs:     clients.filter((c) => c.role === 'tv').length,
+      monitors: clients.filter((c) => c.role === 'monitor').length,
     },
     scheduler: stopScheduler !== null ? 'running' : 'stopped',
+    session: activeSession
+      ? {
+          id: activeSession.sessionId,
+          circuitId: activeSession.circuitId,
+          status: activeSession.pausedAt === null ? 'running' : 'paused',
+          phaseEndsAt: new Date(activeSession.phaseEndsAt).toISOString(),
+        }
+      : null,
+  };
+});
+
+app.get('/diagnostics', { preHandler: [requireAdmin] }, async () => {
+  const [db, storage, displays] = await Promise.all([
+    checkDatabase(),
+    checkStorageBuckets(),
+    prisma.display.findMany({ orderBy: { pairedAt: 'asc' } }),
+  ]);
+  const clients = hub.all();
+  const onlineIds = hub.onlineDisplayIds();
+  const now = Date.now();
+  const activeSession = orchestrator.getState();
+
+  return {
+    status: db.ok && storage.ok ? 'ok' : 'degraded',
+    generatedAt: new Date(now).toISOString(),
+    version: process.env['APP_VERSION'] ?? '0.1.0',
+    components: {
+      database: db,
+      storage,
+      scheduler: { ok: stopScheduler !== null, status: stopScheduler !== null ? 'running' : 'stopped' },
+      websocket: {
+        ok: true,
+        total: clients.length,
+        byRole: {
+          coach: clients.filter((c) => c.role === 'coach').length,
+          tv: clients.filter((c) => c.role === 'tv').length,
+          monitor: clients.filter((c) => c.role === 'monitor').length,
+        },
+      },
+    },
+    session: activeSession
+      ? {
+          id: activeSession.sessionId,
+          circuitId: activeSession.circuitId,
+          status: activeSession.pausedAt === null ? 'running' : 'paused',
+          currentPhaseIdx: activeSession.currentPhaseIdx,
+          totalPhases: activeSession.phases.length,
+          phaseEndsAt: new Date(activeSession.phaseEndsAt).toISOString(),
+        }
+      : null,
+    displays: displays.map((display) => {
+      const lastSeenAt = display.lastSeen?.toISOString() ?? null;
+      const lastSeenSecondsAgo = display.lastSeen
+        ? Math.max(0, Math.round((now - display.lastSeen.getTime()) / 1000))
+        : null;
+      const online = onlineIds.has(display.id);
+
+      return {
+        id: display.id,
+        name: display.name,
+        role: display.role,
+        stationNumber: display.stationNumber,
+        online,
+        status: online ? 'online' : display.lastSeen ? 'offline' : 'never_seen',
+        lastSeenAt,
+        lastSeenSecondsAgo,
+        deviceModel: display.deviceModel,
+        deviceOs: display.deviceOs,
+        appVersion: display.appVersion,
+      };
+    }),
   };
 });
 
@@ -184,7 +282,7 @@ await app.register(updateRoutes);
 
 // ---- WebSocket endpoint ----
 
-app.get('/ws', { websocket: true }, (socket, req) => {
+app.get('/ws', { websocket: true }, (socket, _req) => {
   // On attend le premier message REGISTER pour identifier le client.
   // Avant ça, on ajoute le client comme UNREGISTERED avec un label temp.
   const tempId = randomUUID();
@@ -207,17 +305,35 @@ app.get('/ws', { websocket: true }, (socket, req) => {
       let parsed: unknown;
       try { parsed = JSON.parse(str); } catch { socket.close(4002, 'Invalid JSON'); return; }
 
-      const p = parsed as Record<string, unknown>;
-      if (p['type'] !== 'REGISTER') { socket.close(4003, 'Expected REGISTER'); return; }
+      const register = RegisterMsg.safeParse(parsed);
+      if (!register.success) { socket.close(4003, 'Expected REGISTER'); return; }
 
-      const role = (p['role'] as ClientRole | undefined) ?? 'monitor';
-      const label = typeof p['label'] === 'string' ? p['label'] : 'unnamed';
-      const displayId = typeof p['displayId'] === 'string' ? p['displayId'] : undefined;
+      const { role, label, displayId, authToken } = register.data;
+      let authenticatedUser: JwtUser | null = null;
+
+      if (role === 'coach' || role === 'monitor') {
+        if (!authToken) { socket.close(4401, 'Auth required'); return; }
+
+        try {
+          authenticatedUser = app.jwt.verify<JwtUser>(authToken);
+        } catch {
+          socket.close(4401, 'Invalid auth token');
+          return;
+        }
+
+        if (authenticatedUser.role !== 'ADMIN' && authenticatedUser.role !== 'COACH') {
+          socket.close(4403, 'Forbidden');
+          return;
+        }
+      }
 
       hub.remove(client.id);
       client = hub.add(socket, role, label, displayId);
 
-      app.log.info({ clientId: client.id, role, label, displayId }, 'WS client registered');
+      app.log.info(
+        { clientId: client.id, role, label, displayId, userId: authenticatedUser?.sub },
+        'WS client registered',
+      );
 
       // Mettre à jour lastSeen à la connexion d'un écran TV appairé
       if (role === 'tv' && displayId) {
@@ -233,7 +349,7 @@ app.get('/ws', { websocket: true }, (socket, req) => {
       });
 
       // Envoyer l'état courant de la session au nouveau client
-      hub.send(client, orchestrator.getSessionUpdateMsg() as import('@cfitv/shared').ServerMessage);
+      hub.send(client, orchestrator.getSessionUpdateMsg() as ServerMessage);
 
       // Diffuser la liste mise à jour au coach
       hub.broadcastToCoaches({ type: 'CLIENT_LIST', payload: hub.clientList() });

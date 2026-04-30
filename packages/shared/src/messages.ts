@@ -24,6 +24,7 @@ export const RegisterMsg = z.object({
   role: z.enum(['tv', 'coach', 'monitor']),
   label: z.string().min(1).max(50),
   displayId: z.string().uuid().optional(), // null si TV pas encore appairée
+  authToken: z.string().min(1).optional(), // JWT requis pour les clients coach/monitor
 });
 
 // Ping de synchronisation d'horloge (NTP-like)

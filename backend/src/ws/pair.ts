@@ -25,13 +25,15 @@ export function registerPin(
   for (const [p, e] of registry) {
     if (e.client.id === client.id) { registry.delete(p); break; }
   }
-  registry.set(pin, {
+  const entry: PendingEntry = {
     client,
-    deviceModel:  deviceInfo?.deviceModel,
-    deviceOs:     deviceInfo?.deviceOs,
-    appVersion:   deviceInfo?.appVersion,
     registeredAt: Date.now(),
-  });
+  };
+  if (deviceInfo?.deviceModel) entry.deviceModel = deviceInfo.deviceModel;
+  if (deviceInfo?.deviceOs) entry.deviceOs = deviceInfo.deviceOs;
+  if (deviceInfo?.appVersion) entry.appVersion = deviceInfo.appVersion;
+
+  registry.set(pin, entry);
 }
 
 /** L'admin revendique un PIN → retourne le client TV et supprime le PIN */
@@ -66,12 +68,22 @@ export function getPendingPairs(): Array<{
   waitingSec:   number;
 }> {
   const now = Date.now();
-  return [...registry.entries()].map(([pin, e]) => ({
-    pin,
-    clientId:    e.client.id,
-    deviceModel: e.deviceModel,
-    deviceOs:    e.deviceOs,
-    appVersion:  e.appVersion,
-    waitingSec:  Math.floor((now - e.registeredAt) / 1000),
-  }));
+  return [...registry.entries()].map(([pin, e]) => {
+    const pair: {
+      pin:          string;
+      clientId:     string;
+      deviceModel?: string;
+      deviceOs?:    string;
+      appVersion?:  string;
+      waitingSec:   number;
+    } = {
+      pin,
+      clientId:   e.client.id,
+      waitingSec: Math.floor((now - e.registeredAt) / 1000),
+    };
+    if (e.deviceModel) pair.deviceModel = e.deviceModel;
+    if (e.deviceOs) pair.deviceOs = e.deviceOs;
+    if (e.appVersion) pair.appVersion = e.appVersion;
+    return pair;
+  });
 }

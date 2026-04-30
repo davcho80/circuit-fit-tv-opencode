@@ -353,6 +353,54 @@ export const displays = {
   },
 };
 
+// ---- Diagnostics ----
+
+export interface Diagnostics {
+  status: 'ok' | 'degraded';
+  generatedAt: string;
+  version: string;
+  components: {
+    database: { ok: boolean; error: string | null };
+    storage: {
+      ok: boolean;
+      buckets: Array<{ name: string; ok: boolean; error: string | null }>;
+    };
+    scheduler: { ok: boolean; status: string };
+    websocket: {
+      ok: boolean;
+      total: number;
+      byRole: { coach: number; tv: number; monitor: number };
+    };
+  };
+  session: {
+    id: string;
+    circuitId: string;
+    status: string;
+    currentPhaseIdx: number;
+    totalPhases: number;
+    phaseEndsAt: string;
+  } | null;
+  displays: Array<{
+    id: string;
+    name: string;
+    role: DisplayRole;
+    stationNumber: number | null;
+    online: boolean;
+    status: 'online' | 'offline' | 'never_seen';
+    lastSeenAt: string | null;
+    lastSeenSecondsAgo: number | null;
+    deviceModel: string | null;
+    deviceOs: string | null;
+    appVersion: string | null;
+  }>;
+}
+
+export const diagnostics = {
+  get(): Promise<Diagnostics> {
+    return request('GET', '/diagnostics');
+  },
+};
+
 // ---- Types Schedule ----
 
 export interface Schedule {

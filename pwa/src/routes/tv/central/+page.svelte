@@ -15,7 +15,7 @@
 
   function start() {
     conn?.destroy();
-    conn = createWsConnection('monitor', label);
+    conn = createWsConnection('tv', label);
   }
   onDestroy(() => conn?.destroy());
 

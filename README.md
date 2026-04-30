@@ -127,6 +127,18 @@ cd pwa     && npm run dev   # → http://localhost:5173
 | MinIO Console | http://localhost:9001 | Stockage vidéo |
 | Adminer | http://localhost:8080 | UI base de données |
 
+### Validation locale
+
+Avant de livrer une modification, lancer depuis la racine :
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+Ces commandes couvrent les workspaces backend, PWA et packages partagés sans relâcher la configuration TypeScript stricte.
+
 ### App Android TV
 
 Ouvrir `android-tv/` dans Android Studio et lancer sur un émulateur TV ou appareil physique. Configurer l'URL du serveur WebSocket (`ws://<ip-locale>:3000/ws`) dans l'écran de setup.

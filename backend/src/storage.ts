@@ -29,6 +29,43 @@ export async function ensureBuckets(): Promise<void> {
   }
 }
 
+export interface BucketHealth {
+  name: string;
+  ok: boolean;
+  error: string | null;
+}
+
+export async function checkStorageBuckets(timeoutMs = 1_500): Promise<{
+  ok: boolean;
+  buckets: BucketHealth[];
+}> {
+  const buckets = [...new Set([config.s3.bucketVideos, config.s3.bucketThumbnails])];
+  const checks = await Promise.all(
+    buckets.map(async (bucket): Promise<BucketHealth> => {
+      try {
+        await Promise.race([
+          s3.send(new HeadBucketCommand({ Bucket: bucket })),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), timeoutMs);
+          }),
+        ]);
+        return { name: bucket, ok: true, error: null };
+      } catch (err) {
+        return {
+          name: bucket,
+          ok: false,
+          error: err instanceof Error ? err.message : 'unknown error',
+        };
+      }
+    }),
+  );
+
+  return {
+    ok: checks.every((bucket) => bucket.ok),
+    buckets: checks,
+  };
+}
+
 /** URL publique d'un objet MinIO (pour dev — en prod, utiliser un CDN ou pre-signed URL). */
 export function publicUrl(bucket: string, key: string): string {
   return `${config.s3.endpoint}/${bucket}/${key}`;

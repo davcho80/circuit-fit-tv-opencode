@@ -27,7 +27,7 @@ export async function tvScheduleRoutes(app: FastifyInstance): Promise<void> {
   app.get('/tv-schedule', async () => {
     const schedules = await prisma.schedule.findMany({
       where:   { isActive: true },
-      include: { circuit: { select: { name: true, icon: true as true } } },
+      include: { circuit: { select: { name: true, icon: true } } },
       orderBy: [{ timeHour: 'asc' }, { timeMinute: 'asc' }],
     });
 

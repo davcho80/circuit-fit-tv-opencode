@@ -107,11 +107,13 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
       break;
 
     case 'PAIR_REGISTER':
-      registerPin(msg.pin, client, {
-        deviceModel: msg.deviceModel,
-        deviceOs:    msg.deviceOs,
-        appVersion:  msg.appVersion,
-      });
+      {
+        const deviceInfo: { deviceModel?: string; deviceOs?: string; appVersion?: string } = {};
+        if (msg.deviceModel) deviceInfo.deviceModel = msg.deviceModel;
+        if (msg.deviceOs) deviceInfo.deviceOs = msg.deviceOs;
+        if (msg.appVersion) deviceInfo.appVersion = msg.appVersion;
+        registerPin(msg.pin, client, deviceInfo);
+      }
       break;
   }
 }

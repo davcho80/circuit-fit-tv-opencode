@@ -9,6 +9,11 @@
 const WS_URL = (import.meta.env['VITE_API_URL'] as string | undefined ?? 'http://localhost:3000')
   .replace(/^http/, 'ws') + '/ws';
 
+function getWsAuthToken(role: 'tv' | 'coach' | 'monitor'): string | undefined {
+  if (role === 'tv' || typeof localStorage === 'undefined') return undefined;
+  return localStorage.getItem('cfitv_token') ?? undefined;
+}
+
 // ---- Types publics ----
 
 export type PhaseType = 'WORK' | 'REST' | 'TRANSITION' | 'HYDRATION';
@@ -62,7 +67,11 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
     ws.onopen = () => {
       connected = true;
       reconnectDelay = 1_000;
-      ws!.send(JSON.stringify({ type: 'REGISTER', role, label }));
+
+      const registerMsg: Record<string, unknown> = { type: 'REGISTER', role, label };
+      const authToken = getWsAuthToken(role);
+      if (authToken) registerMsg['authToken'] = authToken;
+      ws!.send(JSON.stringify(registerMsg));
 
       // Heartbeat toutes les 10 s
       heartbeatTimer = setInterval(() => {

@@ -8,6 +8,7 @@
   import {
     settings  as settingsApi,
     update    as updateApi,
+    diagnostics as diagnosticsApi,
     displays  as displaysApi,
     users     as usersApi,
     pair      as pairApi,
@@ -16,6 +17,7 @@
     type DisplayRole,
     type UserPublic,
     type PendingPair,
+    type Diagnostics,
   } from '$lib/api.js';
 
   if (!authStore.isAdmin) goto('/');
@@ -23,8 +25,8 @@
   let { data } = $props();
 
   // ── Tabs ──────────────────────────────────────────────────────────
-  type Tab = 'studio' | 'screens' | 'tv' | 'users' | 'updates';
-  const validTabs: Tab[] = ['studio', 'screens', 'tv', 'users', 'updates'];
+  type Tab = 'studio' | 'screens' | 'diagnostics' | 'tv' | 'users' | 'updates';
+  const validTabs: Tab[] = ['studio', 'screens', 'diagnostics', 'tv', 'users', 'updates'];
 
   // Lire ?tab= et ?pin= depuis l'URL (QR code de la TV)
   const urlTab = $page.url.searchParams.get('tab') as Tab | null;
@@ -34,6 +36,7 @@
   const tabs = [
     { key: 'studio'  as Tab, icon: '🎨', label: () => t('admin.tab.studio')  },
     { key: 'screens' as Tab, icon: '📺', label: () => t('admin.tab.screens') },
+    { key: 'diagnostics' as Tab, icon: '🩺', label: () => 'Diagnostics' },
     { key: 'tv'      as Tab, icon: '🖥️', label: () => t('admin.tab.tv')      },
     { key: 'users'   as Tab, icon: '👥', label: () => t('admin.tab.users')   },
     { key: 'updates' as Tab, icon: '🔄', label: () => t('admin.tab.updates') },
@@ -292,6 +295,41 @@
     if (sec < 86400) return `${Math.floor(sec / 3600)} h`;
     return `${Math.floor(sec / 86400)} j`;
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // TAB: DIAGNOSTICS
+  // ═══════════════════════════════════════════════════════════════════
+
+  let diagnostics = $state<Diagnostics | null>(null);
+  let diagnosticsLoading = $state(false);
+  let diagnosticsError = $state('');
+
+  async function refreshDiagnostics() {
+    diagnosticsLoading = true;
+    diagnosticsError = '';
+    try {
+      diagnostics = await diagnosticsApi.get();
+    } catch (e) {
+      diagnosticsError = e instanceof Error ? e.message : 'Erreur de diagnostic';
+    } finally {
+      diagnosticsLoading = false;
+    }
+  }
+
+  function ageLabel(seconds: number | null): string {
+    if (seconds === null) return 'Jamais vu';
+    if (seconds < 60) return `il y a ${seconds} s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `il y a ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    return `il y a ${hours} h`;
+  }
+
+  $effect(() => {
+    if (activeTab === 'diagnostics' && !diagnostics && !diagnosticsLoading) {
+      void refreshDiagnostics();
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════════════
   // TAB: USERS
@@ -779,6 +817,119 @@
           </div>
         {/if}
       </section>
+    </div>
+  {/if}
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- TAB DIAGNOSTICS                                                -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  {#if activeTab === 'diagnostics'}
+    <div class="space-y-6 max-w-4xl">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100">Diagnostics</h2>
+          <p class="text-slate-400 text-sm mt-0.5">
+            {diagnostics ? `Généré ${new Date(diagnostics.generatedAt).toLocaleTimeString('fr-CA')}` : 'État système'}
+          </p>
+        </div>
+        <button
+          onclick={() => void refreshDiagnostics()}
+          disabled={diagnosticsLoading}
+          class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {diagnosticsLoading ? '...' : 'Actualiser'}
+        </button>
+      </div>
+
+      {#if diagnosticsError}
+        <div class="rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          {diagnosticsError}
+        </div>
+      {/if}
+
+      {#if diagnostics}
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+            <div class="text-xs text-slate-500">Backend</div>
+            <div class="mt-1 font-bold {diagnostics.status === 'ok' ? 'text-emerald-300' : 'text-amber-300'}">
+              {diagnostics.status === 'ok' ? 'OK' : 'Dégradé'}
+            </div>
+            <div class="text-xs text-slate-500 mt-1">v{diagnostics.version}</div>
+          </div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+            <div class="text-xs text-slate-500">Base de données</div>
+            <div class="mt-1 font-bold {diagnostics.components.database.ok ? 'text-emerald-300' : 'text-red-300'}">
+              {diagnostics.components.database.ok ? 'OK' : 'Erreur'}
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+            <div class="text-xs text-slate-500">Stockage</div>
+            <div class="mt-1 font-bold {diagnostics.components.storage.ok ? 'text-emerald-300' : 'text-red-300'}">
+              {diagnostics.components.storage.ok ? 'OK' : 'Erreur'}
+            </div>
+            <div class="text-xs text-slate-500 mt-1">
+              {diagnostics.components.storage.buckets.length} bucket(s)
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+            <div class="text-xs text-slate-500">Scheduler</div>
+            <div class="mt-1 font-bold {diagnostics.components.scheduler.ok ? 'text-emerald-300' : 'text-amber-300'}">
+              {diagnostics.components.scheduler.status}
+            </div>
+          </div>
+        </div>
+
+        <section class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-slate-100">WebSocket</h3>
+            <span class="text-sm text-slate-400">{diagnostics.components.websocket.total} client(s)</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-lg bg-slate-950/60 py-3">
+              <div class="text-2xl font-black text-slate-100">{diagnostics.components.websocket.byRole.coach}</div>
+              <div class="text-xs text-slate-500">Coach</div>
+            </div>
+            <div class="rounded-lg bg-slate-950/60 py-3">
+              <div class="text-2xl font-black text-slate-100">{diagnostics.components.websocket.byRole.tv}</div>
+              <div class="text-xs text-slate-500">TV</div>
+            </div>
+            <div class="rounded-lg bg-slate-950/60 py-3">
+              <div class="text-2xl font-black text-slate-100">{diagnostics.components.websocket.byRole.monitor}</div>
+              <div class="text-xs text-slate-500">Monitor</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <h3 class="font-bold text-slate-100 mb-3">Écrans</h3>
+          {#if diagnostics.displays.length === 0}
+            <div class="text-sm text-slate-500 py-5 text-center">Aucun écran appairé</div>
+          {:else}
+            <div class="space-y-2">
+              {#each diagnostics.displays as d (d.id)}
+                <div class="flex items-center justify-between gap-4 rounded-lg bg-slate-950/60 px-3 py-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1.5 h-1.5 rounded-full {d.online ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
+                      <span class="font-medium text-slate-100 truncate">{d.name}</span>
+                      <span class="text-xs text-slate-500">{d.role}{d.stationNumber ? ` #${d.stationNumber}` : ''}</span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-0.5">
+                      {d.deviceModel ?? 'Appareil'}{d.deviceOs ? ` · ${d.deviceOs}` : ''}{d.appVersion ? ` · v${d.appVersion}` : ''}
+                    </div>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <div class="text-xs font-semibold {d.online ? 'text-emerald-300' : 'text-slate-500'}">
+                      {d.online ? 'online' : d.status}
+                    </div>
+                    <div class="text-xs text-slate-600">{ageLabel(d.lastSeenSecondsAgo)}</div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
     </div>
   {/if}
 
