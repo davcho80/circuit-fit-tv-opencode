@@ -4,6 +4,11 @@
   import { circuits as api, type Circuit } from '$lib/api';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
   import { loadTvConfig, type TvConfig } from '$lib/tvConfig.js';
+  import {
+    loadTvCircuitSnapshot,
+    loadTvSessionSnapshot,
+    saveTvCircuitSnapshot,
+  } from '$lib/tvOffline.js';
 
   onMount(async () => {
     await loadSettings();
@@ -11,6 +16,12 @@
     if (config?.mode === 'central') {
       savedConfig = config;
       label = config.label;
+      const cachedSession = loadTvSessionSnapshot();
+      if (cachedSession) {
+        offlineMode = true;
+        lastFetchedId = cachedSession.circuitId;
+        circuitData = loadTvCircuitSnapshot<Circuit>();
+      }
       start();
     }
     applyBranding();
@@ -20,6 +31,7 @@
   let label = $state('TV Centrale');
   let conn = $state<ReturnType<typeof createWsConnection> | null>(null);
   let savedConfig = $state<TvConfig | null>(null);
+  let offlineMode = $state(false);
 
   function start() {
     conn?.destroy();
@@ -46,13 +58,20 @@
     const cid = conn?.session?.circuitId;
     if (cid && cid !== lastFetchedId) {
       lastFetchedId = cid;
-      api.get(cid).then(c => { circuitData = c; });
+      api.get(cid).then(c => {
+        circuitData = c;
+        offlineMode = false;
+        saveTvCircuitSnapshot(c);
+      }).catch(() => {
+        circuitData = loadTvCircuitSnapshot<Circuit>();
+        offlineMode = true;
+      });
     }
-    if (!cid) { circuitData = null; lastFetchedId = ''; }
+    if (!cid && !offlineMode) { circuitData = null; lastFetchedId = ''; }
   });
 
   // ---- Dérivés ----
-  const session = $derived(conn?.session ?? null);
+  const session = $derived(conn?.session ?? (offlineMode ? loadTvSessionSnapshot() : null));
 
   const remainingMs = $derived.by(() => {
     if (!session) return 0;
@@ -336,6 +355,9 @@
             <span class="text-xs text-slate-500">
               {conn.connected ? 'LIVE' : 'Reconnexion…'}
             </span>
+            {#if offlineMode || !conn.connected}
+              <span class="text-xs text-amber-300 ml-auto">Mode cache</span>
+            {/if}
           </div>
         </div>
 

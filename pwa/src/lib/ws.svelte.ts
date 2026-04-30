@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { PairConfigPayload } from './tvConfig.js';
+import { saveTvSessionSnapshot } from './tvOffline.js';
 
 const WS_URL = (import.meta.env['VITE_API_URL'] as string | undefined ?? 'http://localhost:3000')
   .replace(/^http/, 'ws') + '/ws';
@@ -18,7 +19,7 @@ function getWsAuthToken(role: 'tv' | 'coach' | 'monitor'): string | undefined {
 
 // ---- Types publics ----
 
-export type PhaseType = 'WORK' | 'REST' | 'TRANSITION' | 'HYDRATION';
+export type PhaseType = 'WARMUP' | 'WORK' | 'REST' | 'TRANSITION' | 'HYDRATION' | 'COOLDOWN';
 
 export interface SessionPayload {
   id: string;
@@ -125,6 +126,7 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
       }
       case 'SESSION_UPDATE':
         session = (msg['payload'] as SessionPayload | null) ?? null;
+        if (role === 'tv' && session) saveTvSessionSnapshot(session);
         if (session && !sessionEndedReason) {
           // Détection auto-start : session qui arrive sans que le coach ait envoyé START
           // Le backend envoie SESSION_AUTO_STARTED séparément

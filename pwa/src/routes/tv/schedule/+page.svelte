@@ -3,6 +3,7 @@
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
   import { createWsConnection, type WsConnection } from '$lib/ws.svelte.js';
   import { loadTvConfig, type TvConfig } from '$lib/tvConfig.js';
+  import { loadTvScheduleSnapshot, saveTvScheduleSnapshot } from '$lib/tvOffline.js';
 
   // ---- Types ----
   interface ScheduledClass {
@@ -28,6 +29,7 @@
   let loading     = $state(true);
   let now         = $state(new Date());
   let fetchError  = $state(false);
+  let offlineMode = $state(false);
   let savedConfig = $state<TvConfig | null>(null);
   let conn        = $state<WsConnection | null>(null);
 
@@ -40,12 +42,28 @@
       const res = await fetch(`${API_BASE}/tv-schedule`);
       if (res.ok) {
         days = await res.json() as ScheduledDay[];
+        saveTvScheduleSnapshot(days);
+        fetchError = false;
+        offlineMode = false;
+      } else {
+        const cached = loadTvScheduleSnapshot<ScheduledDay[]>();
+        if (cached) {
+          days = cached;
+          offlineMode = true;
+          fetchError = false;
+        } else {
+          fetchError = true;
+        }
+      }
+    } catch {
+      const cached = loadTvScheduleSnapshot<ScheduledDay[]>();
+      if (cached) {
+        days = cached;
+        offlineMode = true;
         fetchError = false;
       } else {
         fetchError = true;
       }
-    } catch {
-      fetchError = true;
     } finally {
       loading = false;
     }
@@ -141,7 +159,7 @@
       </p>
       {#if savedConfig}
         <p class="text-xs mt-2 {conn?.connected ? 'text-emerald-400' : 'text-amber-400'}">
-          {conn?.connected ? 'LIVE' : 'Reconnexion...'}
+          {conn?.connected && !offlineMode ? 'LIVE' : offlineMode ? 'Mode cache' : 'Reconnexion...'}
         </p>
       {/if}
     </div>

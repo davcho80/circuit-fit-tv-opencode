@@ -33,10 +33,35 @@ export default defineConfig({
         navigateFallback: '200.html',
         runtimeCaching: [
           {
-            // Mise en cache réseau-first pour les appels API
-            urlPattern: /^https?:\/\/.*\/api\/.*/,
+            // Les routes API sont servies à la racine par Fastify, pas sous /api.
+            urlPattern: ({ url }) => [
+              '/circuits',
+              '/settings',
+              '/tv-schedule',
+            ].some((path) => url.pathname === path || url.pathname.startsWith(`${path}/`)),
             handler: 'NetworkFirst',
-            options: { cacheName: 'api-cache', networkTimeoutSeconds: 5 },
+            options: {
+              cacheName: 'tv-api-cache',
+              networkTimeoutSeconds: 5,
+              expiration: {
+                maxEntries: 80,
+                maxAgeSeconds: 24 * 60 * 60,
+              },
+            },
+          },
+          {
+            urlPattern: ({ request, url }) =>
+              request.destination === 'image' ||
+              request.destination === 'video' ||
+              url.pathname.startsWith('/uploads/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tv-media-cache',
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 7 * 24 * 60 * 60,
+              },
+            },
           },
         ],
       },

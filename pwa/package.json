@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "svelte-kit sync && tsc --noEmit",
     "lint": "eslint 'src/**/*.{ts,svelte}'",
-    "test": "tsx src/lib/tvConfig.test.ts",
+    "test": "node --import tsx --test 'src/lib/*.test.ts'",
     "format": "prettier --write 'src/**/*.{ts,svelte,css,html}'"
   },
   "dependencies": {

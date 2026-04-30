@@ -12,6 +12,11 @@
     type PairConfigPayload,
     type TvConfig,
   } from '$lib/tvConfig.js';
+  import {
+    loadTvCircuitSnapshot,
+    loadTvSessionSnapshot,
+    saveTvCircuitSnapshot,
+  } from '$lib/tvOffline.js';
 
   onMount(async () => {
     await loadSettings();
@@ -29,6 +34,7 @@
   let savedConfig   = $state<TvConfig | null>(null);
   let pairingPin    = $state('');
   let pairConn      = $state<WsConnection | null>(null);
+  let offlineMode   = $state(false);
 
   function applyConfig(config: TvConfig) {
     savedConfig = config;
@@ -40,13 +46,22 @@
 
   function resumeConfig(config: TvConfig) {
     applyConfig(config);
+    const cachedSession = loadTvSessionSnapshot();
+    if (cachedSession) {
+      offlineMode = true;
+      lastFetchedId = cachedSession.circuitId;
+      circuitData = loadTvCircuitSnapshot<Circuit>();
+    }
     const route = screenRouteFor(config);
     if (route !== '/tv') {
       goto(route);
       return;
     }
     conn?.destroy();
-    conn = createWsConnection('tv', config.label, { displayId: config.displayId });
+    conn = createWsConnection('tv', config.label, {
+      displayId: config.displayId,
+      tvSecret: config.tvSecret,
+    });
   }
 
   function start() {
@@ -132,9 +147,16 @@
     const cid = conn?.session?.circuitId;
     if (cid && cid !== lastFetchedId) {
       lastFetchedId = cid;
-      api.get(cid).then(c => { circuitData = c; });
+      api.get(cid).then(c => {
+        circuitData = c;
+        offlineMode = false;
+        saveTvCircuitSnapshot(c);
+      }).catch(() => {
+        circuitData = loadTvCircuitSnapshot<Circuit>();
+        offlineMode = true;
+      });
     }
-    if (!cid) { circuitData = null; lastFetchedId = ''; }
+    if (!cid && !offlineMode) { circuitData = null; lastFetchedId = ''; }
   });
 
   // ════ Timer ════
@@ -146,7 +168,7 @@
   });
 
   // ════ Dérivés session ════
-  const session = $derived(conn?.session ?? null);
+  const session = $derived(conn?.session ?? (offlineMode ? loadTvSessionSnapshot() : null));
 
   const remainingMs = $derived.by(() => {
     if (!session) return 0;
@@ -462,6 +484,9 @@
           ></span>
           {conn.connected ? 'LIVE' : 'Reconnexion…'}
         </span>
+        {#if offlineMode || !conn.connected}
+          <span class="text-amber-200 font-bold">Mode cache</span>
+        {/if}
       </div>
     </div>
 
