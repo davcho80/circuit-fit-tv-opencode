@@ -45,6 +45,7 @@ import { setupRoutes } from './routes/setup.js';
 import { settingsRoutes } from './routes/settings.js';
 import { tvScheduleRoutes } from './routes/tv-schedule.js';
 import { updateRoutes }     from './routes/update.js';
+import { auditLogsRoutes }  from './routes/audit-logs.js';
 import { jwtFastifyPlugin, requireAdmin, requireAuth } from './auth/jwt.plugin.js';
 import type { JwtUser } from './auth/jwt.plugin.js';
 import { bootstrapAdmin } from './auth/bootstrap.js';
@@ -113,7 +114,7 @@ const PUBLIC_API_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/tv-schedule
 const PROTECTED_PREFIXES  = [
   '/exercises', '/circuits', '/displays', '/sessions',
   '/schedules', '/stats', '/users', '/settings', '/update',
-  '/diagnostics',
+  '/diagnostics', '/audit-logs',
 ];
 
 app.addHook('onRequest', async (req, reply) => {
@@ -297,6 +298,7 @@ await app.register(setupRoutes);
 await app.register(settingsRoutes);
 await app.register(tvScheduleRoutes);
 await app.register(updateRoutes);
+await app.register(auditLogsRoutes);
 
 // ---- WebSocket endpoint ----
 
@@ -354,7 +356,15 @@ app.get('/ws', { websocket: true }, (socket, _req) => {
       }
 
       hub.remove(client.id);
-      client = hub.add(socket, role, label, displayId);
+      client = hub.add(
+        socket,
+        role,
+        label,
+        displayId,
+        authenticatedUser
+          ? { id: authenticatedUser.sub, email: authenticatedUser.email, role: authenticatedUser.role }
+          : undefined,
+      );
 
       app.log.info(
         { clientId: client.id, role, label, displayId, userId: authenticatedUser?.sub },

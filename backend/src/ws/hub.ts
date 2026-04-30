@@ -14,19 +14,31 @@ export interface ConnectedClient {
   role: ClientRole;
   label: string;
   displayId: string | undefined;
+  userId: string | undefined;
+  userEmail: string | undefined;
+  userRole: 'ADMIN' | 'COACH' | undefined;
   connectedAt: number;
 }
 
 class WsHub {
   private clients = new Map<string, ConnectedClient>();
 
-  add(socket: WebSocket, role: ClientRole, label: string, displayId?: string): ConnectedClient {
+  add(
+    socket: WebSocket,
+    role: ClientRole,
+    label: string,
+    displayId?: string,
+    user?: { id: string; email: string; role: 'ADMIN' | 'COACH' },
+  ): ConnectedClient {
     const client: ConnectedClient = {
       id: randomUUID(),
       socket,
       role,
       label,
       displayId,
+      userId: user?.id,
+      userEmail: user?.email,
+      userRole: user?.role,
       connectedAt: Date.now(),
     };
     this.clients.set(client.id, client);
@@ -88,6 +100,7 @@ class WsHub {
       role:        c.role,
       label:       c.label,
       displayId:   c.displayId ?? null,
+      userId:      c.userId ?? null,
       connectedAt: c.connectedAt,
     }));
   }

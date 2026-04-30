@@ -15,6 +15,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { orchestrator } from '../sessions/orchestrator.js';
+import { auditLog } from '../audit.js';
 
 export async function sessionsRoutes(app: FastifyInstance): Promise<void> {
   // GET /sessions
@@ -59,6 +60,12 @@ export async function sessionsRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const sessionId = await orchestrator.start(body.data.circuitId);
+      await auditLog(req, {
+        action:     'session.started',
+        targetType: 'session',
+        targetId:   sessionId,
+        metadata:   { circuitId: body.data.circuitId },
+      });
       return reply.code(201).send({ sessionId });
     } catch (err) {
       return reply.code(422).send({ error: String(err) });
@@ -66,35 +73,63 @@ export async function sessionsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /sessions/pause
-  app.post('/sessions/pause', () => {
+  app.post('/sessions/pause', async (req) => {
     orchestrator.pause();
+    await auditLog(req, {
+      action:     'session.paused',
+      targetType: 'session',
+      targetId:   orchestrator.getState()?.sessionId ?? null,
+    });
     return { ok: true };
   });
 
   // POST /sessions/resume
-  app.post('/sessions/resume', () => {
+  app.post('/sessions/resume', async (req) => {
     orchestrator.resume();
+    await auditLog(req, {
+      action:     'session.resumed',
+      targetType: 'session',
+      targetId:   orchestrator.getState()?.sessionId ?? null,
+    });
     return { ok: true };
   });
 
   // POST /sessions/skip
-  app.post('/sessions/skip', () => {
+  app.post('/sessions/skip', async (req) => {
+    const sessionId = orchestrator.getState()?.sessionId ?? null;
     orchestrator.skip();
+    await auditLog(req, {
+      action:     'session.phase.skipped',
+      targetType: 'session',
+      targetId:   sessionId,
+    });
     return { ok: true };
   });
 
   // POST /sessions/stop
-  app.post('/sessions/stop', async () => {
+  app.post('/sessions/stop', async (req) => {
+    const sessionId = orchestrator.getState()?.sessionId ?? null;
     await orchestrator.stop();
+    await auditLog(req, {
+      action:     'session.stopped',
+      targetType: 'session',
+      targetId:   sessionId,
+    });
     return { ok: true };
   });
 
   // POST /sessions/adjust
-  app.post('/sessions/adjust', (req, reply) => {
+  app.post('/sessions/adjust', async (req, reply) => {
     const body = z.object({ deltaMs: z.number().int() }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
 
     orchestrator.adjust(body.data.deltaMs);
+    await auditLog(req, {
+      action:     'session.adjusted',
+      targetType: 'session',
+      targetId:   orchestrator.getState()?.sessionId ?? null,
+      metadata:   { deltaMs: body.data.deltaMs },
+    });
     return { ok: true };
   });
 }

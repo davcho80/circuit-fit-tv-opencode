@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth/jwt.plugin.js';
 import { uploadLogoToS3 } from '../storage.js';
+import { auditLog } from '../audit.js';
 
 const SettingsPatch = z.object({
   studioName:   z.string().min(1).max(100).optional(),
@@ -48,6 +49,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       create: { id: 'singleton', ...data },
       update: data,
     });
+    await auditLog(req, {
+      action:     'settings.updated',
+      targetType: 'studioSettings',
+      targetId:   'singleton',
+      metadata:   { fields: Object.keys(data) },
+    });
     return updated;
   });
 
@@ -67,6 +74,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         where:  { id: 'singleton' },
         create: { id: 'singleton', logoUrl },
         update: { logoUrl },
+      });
+      await auditLog(req, {
+        action:     'settings.logo.uploaded',
+        targetType: 'studioSettings',
+        targetId:   'singleton',
+        metadata:   { mime, logoUrl },
       });
       return updated;
     } catch (err) {

@@ -212,3 +212,24 @@ model User {
 
   @@index([email])
 }
+
+// ----- Audit Log -----
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   @db.VarChar(80)
+  actorId    String?
+  actorEmail String?  @db.VarChar(255)
+  actorRole  UserRole?
+  targetType String?  @db.VarChar(80)
+  targetId   String?
+  ip         String?  @db.VarChar(80)
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+  @@index([targetType, targetId])
+}

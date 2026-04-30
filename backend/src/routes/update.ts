@@ -13,6 +13,7 @@
 import type { FastifyInstance } from 'fastify';
 import { spawn }                 from 'node:child_process';
 import { requireAdmin }          from '../auth/jwt.plugin.js';
+import { auditLog }              from '../audit.js';
 
 const GITHUB_REPO      = 'davcho80/circuit-fit-tv';
 const CURRENT_VERSION  = process.env['APP_VERSION'] ?? '0.1.0';
@@ -120,10 +121,14 @@ export async function updateRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /update/start — déclenche la mise à jour sans SSE (fire-and-forget)
-  app.post('/update/start', { preHandler: [requireAdmin] }, async (_req, reply) => {
+  app.post('/update/start', { preHandler: [requireAdmin] }, async (req, reply) => {
     if (!UPDATE_SCRIPT) {
       return reply.code(503).send({ error: 'UPDATE_SCRIPT_PATH non configuré' });
     }
+    await auditLog(req, {
+      action:   'system.update.started',
+      metadata: { scriptConfigured: true },
+    });
     // Lancer le script en arrière-plan, détaché du process parent
     spawn('bash', [UPDATE_SCRIPT], { detached: true, stdio: 'ignore' }).unref();
     return reply.code(202).send({ status: 'updating' });

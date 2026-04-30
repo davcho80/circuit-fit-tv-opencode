@@ -403,6 +403,28 @@ export const diagnostics = {
   },
 };
 
+// ---- Audit Logs ----
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  actorId: string | null;
+  actorEmail: string | null;
+  actorRole: 'ADMIN' | 'COACH' | null;
+  targetType: string | null;
+  targetId: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  metadata: unknown;
+  createdAt: string;
+}
+
+export const auditLogs = {
+  list(limit = 25): Promise<AuditLogEntry[]> {
+    return request('GET', `/audit-logs?limit=${limit}`);
+  },
+};
+
 // ---- Types Schedule ----
 
 export interface Schedule {

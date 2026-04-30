@@ -12,6 +12,7 @@ import { hub } from '../ws/hub.js';
 import { claimPinWithInfo, getPendingPairs } from '../ws/pair.js';
 import { prisma } from '../db.js';
 import { requireAuth } from '../auth/jwt.plugin.js';
+import { auditLog } from '../audit.js';
 
 const PairClaimBody = z.object({
   pin:           z.string().length(4).regex(/^\d{4}$/),
@@ -94,6 +95,20 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
 
     // Mettre à jour le displayId dans le hub pour que la TV soit visible immédiatement
     hub.setDisplayId(client.id, display.id);
+
+    await auditLog(req, {
+      action:     'tv.paired',
+      targetType: 'display',
+      targetId:   display.id,
+      metadata: {
+        label:         body.data.label,
+        screenType:    body.data.screenType,
+        stationNumber: body.data.screenType === 'STATION' ? body.data.stationNumber : null,
+        deviceModel:   deviceModel ?? null,
+        deviceOs:      deviceOs ?? null,
+        appVersion:    appVersion ?? null,
+      },
+    });
 
     return { ok: true, clientId: client.id, label: client.label };
   });

@@ -9,6 +9,21 @@ import { handleClockPing } from './clock.js';
 import { orchestrator } from '../sessions/orchestrator.js';
 import { registerPin } from './pair.js';
 import { prisma } from '../db.js';
+import { Prisma } from '../generated/prisma/client.js';
+
+function auditWs(client: ConnectedClient, action: string, targetId?: string | null, metadata?: Prisma.InputJsonValue): void {
+  prisma.auditLog.create({
+    data: {
+      action,
+      actorId:    client.userId ?? null,
+      actorEmail: client.userEmail ?? null,
+      actorRole:  client.userRole ?? null,
+      targetType: targetId ? 'session' : null,
+      targetId:   targetId ?? null,
+      metadata:   metadata ?? Prisma.JsonNull,
+    },
+  }).catch(() => { /* audit best-effort for realtime WS commands */ });
+}
 
 export function handleMessage(client: ConnectedClient, raw: string): void {
   let parsed: unknown;
@@ -56,39 +71,49 @@ export function handleMessage(client: ConnectedClient, raw: string): void {
         hub.send(client, { type: 'ERROR', code: 'FORBIDDEN', message: 'Seul le coach peut démarrer' });
         break;
       }
-      orchestrator.start(msg.circuitId).catch((err: unknown) => {
-        hub.send(client, { type: 'ERROR', code: 'START_FAILED', message: String(err) });
-      });
+      orchestrator.start(msg.circuitId)
+        .then((sessionId) => {
+          auditWs(client, 'session.started.ws', sessionId, { circuitId: msg.circuitId });
+        })
+        .catch((err: unknown) => {
+          hub.send(client, { type: 'ERROR', code: 'START_FAILED', message: String(err) });
+        });
       break;
 
     case 'PAUSE':
       if (client.role !== 'coach') break;
       orchestrator.pause();
+      auditWs(client, 'session.paused.ws', orchestrator.getState()?.sessionId ?? null);
       break;
 
     case 'RESUME':
       if (client.role !== 'coach') break;
       orchestrator.resume();
+      auditWs(client, 'session.resumed.ws', orchestrator.getState()?.sessionId ?? null);
       break;
 
     case 'SKIP':
       if (client.role !== 'coach') break;
+      auditWs(client, 'session.phase.skipped.ws', orchestrator.getState()?.sessionId ?? null);
       orchestrator.skip();
       break;
 
     case 'STOP':
       if (client.role !== 'coach') break;
+      auditWs(client, 'session.stopped.ws', orchestrator.getState()?.sessionId ?? null);
       orchestrator.stop().catch(console.error);
       break;
 
     case 'ADJUST':
       if (client.role !== 'coach') break;
       orchestrator.adjust(msg.deltaMs);
+      auditWs(client, 'session.adjusted.ws', orchestrator.getState()?.sessionId ?? null, { deltaMs: msg.deltaMs });
       break;
 
     case 'HYDRATION_BREAK':
       if (client.role !== 'coach') break;
       orchestrator.hydrationBreak(msg.durationMs);
+      auditWs(client, 'session.hydration_break.ws', orchestrator.getState()?.sessionId ?? null, { durationMs: msg.durationMs });
       break;
 
     case 'DRIFT_REPORT':

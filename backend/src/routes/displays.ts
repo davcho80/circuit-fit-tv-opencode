@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { Display } from '@cfitv/shared';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth/jwt.plugin.js';
+import { auditLog } from '../audit.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function stripUndefined(obj: Record<string, unknown>): any {
@@ -91,6 +92,12 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
       data:   stripUndefined(body.data),
       select: displayPublicSelect,
     });
+    await auditLog(req, {
+      action:     'display.updated',
+      targetType: 'display',
+      targetId:   updated.id,
+      metadata:   { fields: Object.keys(stripUndefined(body.data)), name: updated.name, role: updated.role },
+    });
     return updated;
   });
 
@@ -100,6 +107,12 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
     if (!exists) return reply.code(404).send({ error: 'Display not found' });
 
     await prisma.display.delete({ where: { id: req.params.id } });
+    await auditLog(req, {
+      action:     'display.deleted',
+      targetType: 'display',
+      targetId:   exists.id,
+      metadata:   { name: exists.name, role: exists.role },
+    });
     return reply.code(204).send();
   });
 }

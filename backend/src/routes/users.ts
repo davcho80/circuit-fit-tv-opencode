@@ -11,6 +11,7 @@ import argon2 from 'argon2';
 import { UserCreate, UserPatch } from '@cfitv/shared';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth/jwt.plugin.js';
+import { auditLog } from '../audit.js';
 
 function toPublic(u: { id: string; email: string; role: string; mustChangePassword: boolean; lastLoginAt: Date | null; createdAt: Date }) {
   return {
@@ -49,6 +50,13 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
+    await auditLog(req, {
+      action:     'user.created',
+      targetType: 'user',
+      targetId:   user.id,
+      metadata:   { email: user.email, role: user.role },
+    });
+
     return reply.code(201).send(toPublic(user));
   });
 
@@ -74,6 +82,16 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const updated = await prisma.user.update({ where: { id: req.params.id }, data });
+    await auditLog(req, {
+      action:     'user.updated',
+      targetType: 'user',
+      targetId:   updated.id,
+      metadata: {
+        email:         updated.email,
+        roleChanged:   body.data.role !== undefined,
+        passwordReset: body.data.password !== undefined,
+      },
+    });
     return toPublic(updated);
   });
 
@@ -94,6 +112,12 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await prisma.user.delete({ where: { id: req.params.id } });
+    await auditLog(req, {
+      action:     'user.deleted',
+      targetType: 'user',
+      targetId:   target.id,
+      metadata:   { email: target.email, role: target.role },
+    });
     return reply.code(204).send();
   });
 }

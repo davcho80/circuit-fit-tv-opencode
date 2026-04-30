@@ -9,6 +9,7 @@
     settings  as settingsApi,
     update    as updateApi,
     diagnostics as diagnosticsApi,
+    auditLogs as auditLogsApi,
     displays  as displaysApi,
     users     as usersApi,
     pair      as pairApi,
@@ -19,6 +20,7 @@
     type UserPublic,
     type PendingPair,
     type Diagnostics,
+    type AuditLogEntry,
   } from '$lib/api.js';
 
   if (!authStore.isAdmin) goto('/');
@@ -305,6 +307,7 @@
   // ═══════════════════════════════════════════════════════════════════
 
   let diagnostics = $state<Diagnostics | null>(null);
+  let recentAuditLogs = $state<AuditLogEntry[]>([]);
   let diagnosticsLoading = $state(false);
   let diagnosticsError = $state('');
 
@@ -312,7 +315,12 @@
     diagnosticsLoading = true;
     diagnosticsError = '';
     try {
-      diagnostics = await diagnosticsApi.get();
+      const [nextDiagnostics, nextAuditLogs] = await Promise.all([
+        diagnosticsApi.get(),
+        auditLogsApi.list(12).catch(() => [] as AuditLogEntry[]),
+      ]);
+      diagnostics = nextDiagnostics;
+      recentAuditLogs = nextAuditLogs;
     } catch (e) {
       diagnosticsError = e instanceof Error ? e.message : 'Erreur de diagnostic';
     } finally {
@@ -327,6 +335,12 @@
     if (minutes < 60) return `il y a ${minutes} min`;
     const hours = Math.floor(minutes / 60);
     return `il y a ${hours} h`;
+  }
+
+  function auditActionLabel(action: string): string {
+    return action
+      .replaceAll('.', ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   $effect(() => {
@@ -928,6 +942,35 @@
                       {d.online ? 'online' : d.status}
                     </div>
                     <div class="text-xs text-slate-600">{ageLabel(d.lastSeenSecondsAgo)}</div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-slate-100">Audit admin</h3>
+            <span class="text-xs text-slate-500">{recentAuditLogs.length} événement(s)</span>
+          </div>
+          {#if recentAuditLogs.length === 0}
+            <div class="text-sm text-slate-500 py-5 text-center">Aucune action critique enregistrée</div>
+          {:else}
+            <div class="space-y-2">
+              {#each recentAuditLogs as log (log.id)}
+                <div class="rounded-lg bg-slate-950/60 px-3 py-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-medium text-slate-100 truncate">{auditActionLabel(log.action)}</div>
+                      <div class="text-xs text-slate-500 mt-0.5">
+                        {log.actorEmail ?? 'Système'}{log.targetType ? ` · ${log.targetType}` : ''}{log.targetId ? ` · ${log.targetId.slice(0, 8)}` : ''}
+                      </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <div class="text-xs text-slate-400">{new Date(log.createdAt).toLocaleTimeString('fr-CA')}</div>
+                      {#if log.ip}<div class="text-xs text-slate-600">{log.ip}</div>{/if}
+                    </div>
                   </div>
                 </div>
               {/each}
