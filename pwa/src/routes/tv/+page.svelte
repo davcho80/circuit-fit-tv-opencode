@@ -187,13 +187,17 @@
   // Pause programmée (phase HYDRATION) OU pause manuelle coach
   const isHydration    = $derived(session?.phase.type === 'HYDRATION' || hydrationRemainingSec > 0);
   const hydrationCount = $derived(session?.phase.type === 'HYDRATION' ? remainingSec : hydrationRemainingSec);
+  const isGlobalPhase  = $derived(session?.phase.type === 'WARMUP' || session?.phase.type === 'COOLDOWN');
 
   // ════ Couleurs ════
   type PhaseCfg = { bg: string; dim: string; accent: string; label: string };
   const PHASE: Record<string, PhaseCfg> = {
+    WARMUP:     { bg: '#be123c', dim: '#881337', accent: '#fda4af', label: 'WARMUP'     },
     WORK:       { bg: '#059669', dim: '#065f46', accent: '#34d399', label: 'TRAVAIL'    },
     REST:       { bg: '#0369a1', dim: '#075985', accent: '#7dd3fc', label: 'REPOS'      },
     TRANSITION: { bg: '#d97706', dim: '#92400e', accent: '#fcd34d', label: 'TRANSITION' },
+    HYDRATION:  { bg: '#0891b2', dim: '#155e75', accent: '#67e8f9', label: 'PAUSE EAU'  },
+    COOLDOWN:   { bg: '#7c3aed', dim: '#5b21b6', accent: '#ddd6fe', label: 'COOLDOWN'   },
     WAIT:       { bg: '#0f172a', dim: '#1e293b', accent: '#475569', label: 'ATTENTE'    },
   };
 
@@ -490,6 +494,21 @@
               </p>
               <p class="text-cyan-400/60 tracking-widest text-sm uppercase">secondes</p>
             </div>
+          </div>
+
+        {:else if isGlobalPhase}
+          <!-- ══ WARMUP / COOLDOWN ══ -->
+          <div class="flex-1 flex flex-col items-center justify-center gap-5 text-center px-10"
+               style="background: rgba(0,0,0,0.35);">
+            <p class="text-2xl font-black tracking-[0.25em] uppercase opacity-70">{phaseCfg.label}</p>
+            <p class="text-9xl font-black tabular-nums leading-none"
+               style="color: {phaseCfg.accent}; text-shadow: 0 0 40px rgba(255,255,255,0.18);">
+              {fmtTime(remainingSec)}
+            </p>
+            <p class="text-5xl font-black leading-tight">{session.phase.label}</p>
+            {#if circuitData?.coachNotes}
+              <p class="max-w-4xl text-2xl leading-snug opacity-80">{circuitData.coachNotes}</p>
+            {/if}
           </div>
 
         {:else if isMyWork || session.phase.type !== 'WORK'}

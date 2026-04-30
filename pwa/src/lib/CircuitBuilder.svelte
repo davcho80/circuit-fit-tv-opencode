@@ -27,6 +27,10 @@
   let workSec = $state(initial?.workSec ?? 40);
   let restSec = $state(initial?.restSec ?? 20);
   let transitionSec = $state(initial?.transitionSec ?? 10);
+  let warmupSec = $state(initial?.warmupSec ?? 0);
+  let cooldownSec = $state(initial?.cooldownSec ?? 0);
+  let coachNotes = $state(initial?.coachNotes ?? '');
+  let whiteboardEnabled = $state(initial?.whiteboardEnabled ?? true);
   let rotationMode = $state<'CLASSIC' | 'FIXED'>(initial?.rotationMode ?? 'CLASSIC');
 
   // Stations locales
@@ -139,8 +143,9 @@
   // ---- Durée estimée ----
   let estimatedMin = $derived(() => {
     const n = stations.length;
+    const setup = warmupSec + cooldownSec;
     const perRound = (workSec + restSec) * n + transitionSec * Math.max(0, n - 1);
-    return Math.round((perRound * rounds) / 60);
+    return Math.round((setup + perRound * rounds) / 60);
   });
 
   // ---- Validation & submit ----
@@ -167,6 +172,10 @@
         workSec,
         restSec,
         transitionSec,
+        warmupSec,
+        cooldownSec,
+        coachNotes: coachNotes.trim() || null,
+        whiteboardEnabled,
         rotationMode,
         stations: stations.map((s, i) => ({
           position:          i + 1,
@@ -275,6 +284,61 @@
             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2
                    text-slate-100 text-sm text-center focus:outline-none focus:border-sky-500" />
         </div>
+      </div>
+
+      <!-- Circuit V2 : avant/après cours -->
+      <div class="space-y-3 border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm font-medium text-slate-300">Avant/après cours</span>
+          <label class="inline-flex items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              bind:checked={whiteboardEnabled}
+              class="accent-sky-500"
+            />
+            Whiteboard
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block text-xs font-medium text-slate-400" for="c-warmup">
+            Warmup
+            <select
+              id="c-warmup"
+              bind:value={warmupSec}
+              class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2
+                     text-slate-100 text-sm focus:outline-none focus:border-sky-500"
+            >
+              {#each [[0,'Aucun'],[180,'3 min'],[300,'5 min'],[600,'10 min'],[900,'15 min']] as [s, lbl]}
+                <option value={s}>{lbl}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="block text-xs font-medium text-slate-400" for="c-cooldown">
+            Cooldown
+            <select
+              id="c-cooldown"
+              bind:value={cooldownSec}
+              class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2
+                     text-slate-100 text-sm focus:outline-none focus:border-sky-500"
+            >
+              {#each [[0,'Aucun'],[120,'2 min'],[180,'3 min'],[300,'5 min'],[600,'10 min']] as [s, lbl]}
+                <option value={s}>{lbl}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
+        <label class="block text-xs font-medium text-slate-400" for="c-coach-notes">
+          Note coach / whiteboard
+          <textarea
+            id="c-coach-notes"
+            bind:value={coachNotes}
+            maxlength="1000"
+            rows="3"
+            placeholder="Objectif du cours, consignes, adaptations..."
+            class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100
+                   placeholder:text-slate-500 focus:outline-none focus:border-sky-500 text-sm resize-none"
+          ></textarea>
+        </label>
       </div>
 
       <!-- Pauses eau programmées -->

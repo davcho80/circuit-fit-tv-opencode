@@ -32,7 +32,7 @@ export const SessionStatus = z.enum([
 ]);
 export type SessionStatus = z.infer<typeof SessionStatus>;
 
-export const PhaseType = z.enum(['TRANSITION', 'WORK', 'REST', 'HYDRATION']);
+export const PhaseType = z.enum(['WARMUP', 'TRANSITION', 'WORK', 'REST', 'HYDRATION', 'COOLDOWN']);
 export type PhaseType = z.infer<typeof PhaseType>;
 
 export const UserRole = z.enum(['ADMIN', 'COACH']);
@@ -132,6 +132,10 @@ export const Circuit = z.object({
   restSec: z.number().int().min(0).max(300),
   transitionSec: z.number().int().min(0).max(60),
   rotationMode: RotationMode,
+  warmupSec: z.number().int().min(0).max(1800).default(0),
+  cooldownSec: z.number().int().min(0).max(1800).default(0),
+  coachNotes: z.string().max(1000).nullable().default(null),
+  whiteboardEnabled: z.boolean().default(true),
   stations: z.array(CircuitStation).min(2).max(20),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -156,6 +160,10 @@ export const CircuitCreate = Circuit.omit({
   updatedAt: true,
 }).extend({
   icon: z.string().max(10).nullable().optional(),
+  warmupSec: z.number().int().min(0).max(1800).optional(),
+  cooldownSec: z.number().int().min(0).max(1800).optional(),
+  coachNotes: z.string().max(1000).nullable().optional(),
+  whiteboardEnabled: z.boolean().optional(),
 }).extend({
   stations: z
     .array(

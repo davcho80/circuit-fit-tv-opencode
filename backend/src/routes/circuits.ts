@@ -52,6 +52,10 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
       data: {
         ...circuitData,
         icon: icon ?? null,
+        warmupSec: circuitData.warmupSec ?? 0,
+        cooldownSec: circuitData.cooldownSec ?? 0,
+        coachNotes: circuitData.coachNotes ?? null,
+        whiteboardEnabled: circuitData.whiteboardEnabled ?? true,
         stations: {
           create: stations.map((s) => ({
             position:           s.position,

@@ -165,6 +165,10 @@ export interface Circuit {
   restSec: number;
   transitionSec: number;
   rotationMode: RotationMode;
+  warmupSec: number;
+  cooldownSec: number;
+  coachNotes: string | null;
+  whiteboardEnabled: boolean;
   stations: CircuitStationData[];
   scheduledBreaks: ScheduledBreak[];
   layoutLinks: LayoutLink[] | null;
@@ -192,6 +196,10 @@ export interface CircuitCreate {
   restSec: number;
   transitionSec: number;
   rotationMode: RotationMode;
+  warmupSec?: number;
+  cooldownSec?: number;
+  coachNotes?: string | null;
+  whiteboardEnabled?: boolean;
   stations: CircuitStationInput[];
   scheduledBreaks?: Array<{ afterRound: number; durationSec: number; label?: string }>;
 }

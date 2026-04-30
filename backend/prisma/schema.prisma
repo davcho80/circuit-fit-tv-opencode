@@ -47,10 +47,12 @@ enum SessionStatus {
 }
 
 enum PhaseType {
+  WARMUP
   TRANSITION
   WORK
   REST
   HYDRATION
+  COOLDOWN
 }
 
 enum StationMode {
@@ -89,6 +91,10 @@ model Circuit {
   transitionSec  Int
   rotationMode   RotationMode
   icon           String?      @db.VarChar(10)   // emoji ou court identifiant
+  warmupSec      Int          @default(0)
+  cooldownSec    Int          @default(0)
+  coachNotes     String?      @db.VarChar(1000)
+  whiteboardEnabled Boolean   @default(true)
   layoutLinks    Json?                          // Array<{from: stationId, to: stationId}>
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

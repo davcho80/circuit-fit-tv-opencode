@@ -70,9 +70,12 @@
 
   // ---- Phase config ----
   const PHASE: Record<string, { color: string; bg: string; accent: string; label: string }> = {
+    WARMUP:     { color: '#fb7185', bg: '#4c0519', accent: '#fda4af', label: 'WARMUP'     },
     WORK:       { color: '#10b981', bg: '#064e3b', accent: '#34d399', label: 'TRAVAIL'    },
     REST:       { color: '#38bdf8', bg: '#0c4a6e', accent: '#7dd3fc', label: 'REPOS'      },
     TRANSITION: { color: '#fbbf24', bg: '#451a03', accent: '#fcd34d', label: 'TRANSITION' },
+    HYDRATION:  { color: '#22d3ee', bg: '#164e63', accent: '#67e8f9', label: 'PAUSE EAU'  },
+    COOLDOWN:   { color: '#a78bfa', bg: '#2e1065', accent: '#c4b5fd', label: 'COOLDOWN'   },
   };
 
   const phaseCfg = $derived(session ? (PHASE[session.phase.type] ?? PHASE['WORK']!) : null);
@@ -237,6 +240,11 @@
           <p class="text-base font-semibold text-slate-200 leading-snug">
             {session.phase.label}
           </p>
+          {#if circuitData?.coachNotes && (session.phase.type === 'WARMUP' || session.phase.type === 'COOLDOWN')}
+            <p class="text-sm text-slate-400 leading-snug mt-3">
+              {circuitData.coachNotes}
+            </p>
+          {/if}
         </div>
 
         <!-- Timer principal -->
@@ -299,6 +307,20 @@
                 <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0"></span>
                 <span class="text-slate-400 text-sm">Transition</span>
                 <span class="ml-auto font-bold text-slate-200 tabular-nums">{circuitData.transitionSec}s</span>
+              </div>
+            {/if}
+            {#if circuitData.warmupSec > 0}
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0"></span>
+                <span class="text-slate-400 text-sm">Warmup</span>
+                <span class="ml-auto font-bold text-slate-200 tabular-nums">{circuitData.warmupSec}s</span>
+              </div>
+            {/if}
+            {#if circuitData.cooldownSec > 0}
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0"></span>
+                <span class="text-slate-400 text-sm">Cooldown</span>
+                <span class="ml-auto font-bold text-slate-200 tabular-nums">{circuitData.cooldownSec}s</span>
               </div>
             {/if}
           </div>

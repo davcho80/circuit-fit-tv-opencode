@@ -7,22 +7,9 @@
 //   - diffusion WebSocket à chaque changement d'état
 // ============================================================
 
-import type { PhaseType } from '@cfitv/shared';
 import { hub } from '../ws/hub.js';
 import { prisma } from '../db.js';
-
-interface Phase {
-  type: PhaseType;
-  label: string;
-  durationMs: number;
-  stationIdx: number; // index dans circuit.stations
-  round: number;
-  // Mode REPS
-  setNumber?:  number;
-  totalSets?:  number;
-  reps?:       number;
-  isRepsMode?: boolean;
-}
+import { buildPhases, type Phase } from './phase-plan.js';
 
 interface ActiveSession {
   sessionId: string;
@@ -311,123 +298,6 @@ class SessionOrchestrator {
       },
     });
   }
-}
-
-// ---- Helpers ----
-
-type CircuitWithStations = Awaited<
-  ReturnType<typeof prisma.circuit.findUniqueOrThrow>
-> & {
-  stations: Array<{
-    position:          number;
-    stationMode:       string;
-    sets:              number | null;
-    reps:              number | null;
-    restBetweenSetsSec: number | null;
-    exercises: Array<{ exercise: { name: string } }>;
-  }>;
-  scheduledBreaks: Array<{ afterRound: number; durationSec: number; label: string }>;
-};
-
-function buildPhases(circuit: CircuitWithStations): Phase[] {
-  const phases: Phase[] = [];
-  const stationCount = circuit.stations.length;
-
-  // Index des pauses par round
-  const breaksByRound = new Map<number, { durationSec: number; label: string }>();
-  for (const b of circuit.scheduledBreaks) {
-    breaksByRound.set(b.afterRound, { durationSec: b.durationSec, label: b.label });
-  }
-
-  for (let round = 1; round <= circuit.rounds; round++) {
-    for (let si = 0; si < stationCount; si++) {
-      const station = circuit.stations[si]!;
-      const exerciseNames = station.exercises.map((e) => e.exercise.name).join(' / ');
-
-      // Transition avant chaque station (sauf la première du premier round)
-      if (circuit.transitionSec > 0 && !(round === 1 && si === 0)) {
-        phases.push({
-          type: 'TRANSITION',
-          label: `→ Station ${station.position}`,
-          durationMs: circuit.transitionSec * 1000,
-          stationIdx: si,
-          round,
-        });
-      }
-
-      if (station.stationMode === 'REPS') {
-        // ── Mode REPS : sets × (WORK manuel + REST auto) ──────────
-        const totalSets = station.sets  ?? 3;
-        const reps      = station.reps  ?? 10;
-        const restMs    = (station.restBetweenSetsSec ?? 60) * 1000;
-
-        for (let setNum = 1; setNum <= totalSets; setNum++) {
-          // WORK : pas de minuterie (1 h = avancement manuel par le coach)
-          phases.push({
-            type:       'WORK',
-            label:      `Set ${setNum}/${totalSets} — ${reps} reps`,
-            durationMs: 3_600_000,
-            stationIdx: si,
-            round,
-            setNumber:  setNum,
-            totalSets,
-            reps,
-            isRepsMode: true,
-          });
-
-          // REST entre chaque set (pas après le dernier)
-          if (setNum < totalSets) {
-            phases.push({
-              type:       'REST',
-              label:      'Repos',
-              durationMs: restMs,
-              stationIdx: si,
-              round,
-              setNumber:  setNum,
-              totalSets,
-              reps,
-              isRepsMode: true,
-            });
-          }
-        }
-      } else {
-        // ── Mode TIME : comportement existant ─────────────────────
-        phases.push({
-          type:      'WORK',
-          label:     exerciseNames || `Station ${station.position}`,
-          durationMs: circuit.workSec * 1000,
-          stationIdx: si,
-          round,
-        });
-
-        // Repos après travail (sauf après la dernière station du dernier round)
-        const isLast = round === circuit.rounds && si === stationCount - 1;
-        if (circuit.restSec > 0 && !isLast) {
-          phases.push({
-            type:      'REST',
-            label:     'Repos',
-            durationMs: circuit.restSec * 1000,
-            stationIdx: si,
-            round,
-          });
-        }
-      }
-    }
-
-    // Pause eau programmée après ce round (pas après le dernier round)
-    const brk = breaksByRound.get(round);
-    if (brk && round < circuit.rounds) {
-      phases.push({
-        type: 'HYDRATION',
-        label: brk.label,
-        durationMs: brk.durationSec * 1000,
-        stationIdx: 0,
-        round,
-      });
-    }
-  }
-
-  return phases;
 }
 
 export const orchestrator = new SessionOrchestrator();
