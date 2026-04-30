@@ -11,7 +11,7 @@
   });
 
   // ════ Configuration ════
-  let screenType    = $state<'station' | 'dashboard'>('station');
+  let screenType    = $state<'station' | 'dashboard' | 'schedule'>('station');
   let label         = $state('Station 1');
   let stationNumber = $state(1);          // 1-basé → correspond à circuit.stations[n-1]
   let orientation   = $state<'landscape' | 'portrait'>('landscape');
@@ -20,6 +20,10 @@
   function start() {
     if (screenType === 'dashboard') {
       goto('/tv/central');
+      return;
+    }
+    if (screenType === 'schedule') {
+      goto('/tv/schedule');
       return;
     }
     conn?.destroy();
@@ -164,15 +168,20 @@
         <!-- Type d'écran -->
         <div class="space-y-1.5">
           <p class="text-sm font-medium text-slate-300">Type d'écran</p>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-3 gap-3">
             {#each [
               { value: 'station',   icon: '🏋️', label: 'Station',   desc: 'Exercices & timer'  },
               { value: 'dashboard', icon: '📊', label: 'Dashboard',  desc: 'Vue d\'ensemble'     },
+              { value: 'schedule',  icon: '📅', label: 'Calendrier', desc: 'Horaire des cours'   },
             ] as opt}
               <button
                 onclick={() => {
-                  screenType = opt.value as 'station' | 'dashboard';
-                  label = opt.value === 'dashboard' ? 'Dashboard' : 'Station 1';
+                  screenType = opt.value as 'station' | 'dashboard' | 'schedule';
+                  label = opt.value === 'dashboard'
+                    ? 'Dashboard'
+                    : opt.value === 'schedule'
+                      ? 'Calendrier'
+                      : 'Station 1';
                 }}
                 class="flex flex-col items-center gap-1.5 px-4 py-4 rounded-xl border-2 transition-all
                        {screenType === opt.value

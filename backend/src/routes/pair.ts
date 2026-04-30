@@ -16,9 +16,17 @@ const PairClaimBody = z.object({
   pin:           z.string().length(4).regex(/^\d{4}$/),
   label:         z.string().min(1).max(50),
   stationNumber: z.number().int().min(1).max(20),
-  screenType:    z.enum(['STATION', 'DASHBOARD', 'CENTRAL']),
+  screenType:    z.enum(['STATION', 'DASHBOARD', 'CENTRAL', 'SCHEDULE']),
   isLandscape:   z.boolean(),
 });
+
+type PairScreenType = z.infer<typeof PairClaimBody>['screenType'];
+
+function displayRoleFor(screenType: PairScreenType): 'STATION' | 'CENTRAL' | 'SCHEDULE' {
+  if (screenType === 'STATION') return 'STATION';
+  if (screenType === 'SCHEDULE') return 'SCHEDULE';
+  return 'CENTRAL';
+}
 
 export async function pairRoutes(app: FastifyInstance): Promise<void> {
 
@@ -43,7 +51,7 @@ export async function pairRoutes(app: FastifyInstance): Promise<void> {
     const { client, deviceModel, deviceOs, appVersion } = entry;
 
     // Créer l'enregistrement Display en DB
-    const role = body.data.screenType === 'STATION' ? 'STATION' : 'CENTRAL';
+    const role = displayRoleFor(body.data.screenType);
 
     const display = await prisma.display.create({
       data: {

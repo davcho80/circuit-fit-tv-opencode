@@ -222,7 +222,7 @@ export const PairConfigMsg = z.object({
   displayId:    z.string().uuid(),
   label:        z.string().min(1).max(50),
   stationNumber: z.number().int().min(1).max(20),
-  screenType:   z.enum(['STATION', 'DASHBOARD', 'CENTRAL']),
+  screenType:   z.enum(['STATION', 'DASHBOARD', 'CENTRAL', 'SCHEDULE']),
   isLandscape:  z.boolean(),
   primaryColor: z.string().optional(),
   logoUrl:      z.string().nullable().optional(),

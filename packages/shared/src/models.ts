@@ -21,7 +21,7 @@ export type Difficulty = z.infer<typeof Difficulty>;
 export const RotationMode = z.enum(['CLASSIC', 'FIXED']);
 export type RotationMode = z.infer<typeof RotationMode>;
 
-export const DisplayRole = z.enum(['STATION', 'CENTRAL', 'UNASSIGNED']);
+export const DisplayRole = z.enum(['STATION', 'CENTRAL', 'SCHEDULE', 'UNASSIGNED']);
 export type DisplayRole = z.infer<typeof DisplayRole>;
 
 export const SessionStatus = z.enum([

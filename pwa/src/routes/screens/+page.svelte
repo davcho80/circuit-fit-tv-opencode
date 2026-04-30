@@ -11,7 +11,7 @@
   const pinFromUrl = $page.url.searchParams.get('pin') ?? '';
 
   let pin           = $state(pinFromUrl);
-  let screenType    = $state<'STATION' | 'CENTRAL'>('STATION');
+  let screenType    = $state<'STATION' | 'CENTRAL' | 'SCHEDULE'>('STATION');
   let label         = $state('Station 1');
   let stationNumber = $state(1);
   let isLandscape   = $state(true);
@@ -21,7 +21,8 @@
 
   $effect(() => {
     if (screenType === 'CENTRAL') label = 'Central';
-    else if (label === 'Central') label = `Station ${stationNumber}`;
+    else if (screenType === 'SCHEDULE') label = 'Calendrier';
+    else if (label === 'Central' || label === 'Calendrier') label = `Station ${stationNumber}`;
   });
   $effect(() => {
     if (screenType === 'STATION') label = `Station ${stationNumber}`;
@@ -113,12 +114,14 @@
   const ROLE_LABEL: Record<DisplayRole, string> = {
     STATION:    'Station',
     CENTRAL:    'Central',
+    SCHEDULE:   'Calendrier',
     UNASSIGNED: 'Non assigné',
   };
 
   const ROLE_ICON: Record<DisplayRole, string> = {
     STATION:    '🏋️',
     CENTRAL:    '📊',
+    SCHEDULE:   '📅',
     UNASSIGNED: '❓',
   };
 
@@ -176,6 +179,7 @@
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium
                   {d.role === 'STATION'    ? 'bg-sky-900/50 text-sky-300' :
                    d.role === 'CENTRAL'    ? 'bg-violet-900/50 text-violet-300' :
+                   d.role === 'SCHEDULE'   ? 'bg-amber-900/50 text-amber-300' :
                                              'bg-slate-800 text-slate-400'}">
                   {ROLE_LABEL[d.role]}{d.role === 'STATION' && d.stationNumber != null ? ` #${d.stationNumber}` : ''}
                 </span>
@@ -248,13 +252,14 @@
       <!-- Type -->
       <div class="space-y-1.5">
         <p class="text-sm font-medium text-slate-300">Type d'écran</p>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           {#each [
             { value: 'STATION', icon: '🏋️', label: 'Station',  desc: 'Exercices & timer' },
             { value: 'CENTRAL', icon: '📊', label: 'Central',  desc: 'Vue d\'ensemble'   },
+            { value: 'SCHEDULE', icon: '📅', label: 'Calendrier', desc: 'Horaire des cours' },
           ] as opt}
             <button
-              onclick={() => { screenType = opt.value as 'STATION' | 'CENTRAL'; }}
+              onclick={() => { screenType = opt.value as 'STATION' | 'CENTRAL' | 'SCHEDULE'; }}
               class="flex flex-col items-center gap-1.5 px-4 py-4 rounded-xl border-2 transition-all
                      {screenType === opt.value
                        ? 'border-sky-500 bg-sky-500/10 text-sky-300'
@@ -379,10 +384,11 @@
         <!-- Rôle -->
         <div>
           <p class="text-sm font-medium text-slate-300 mb-2">Rôle</p>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-4 gap-2">
             {#each [
               { value: 'STATION',    icon: '🏋️', label: 'Station'     },
               { value: 'CENTRAL',    icon: '📊', label: 'Central'     },
+              { value: 'SCHEDULE',   icon: '📅', label: 'Calendrier'  },
               { value: 'UNASSIGNED', icon: '❓', label: 'Non assigné' },
             ] as opt}
               <button

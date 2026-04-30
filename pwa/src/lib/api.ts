@@ -288,7 +288,7 @@ export const sessions = {
 
 // ---- Types Display ----
 
-export type DisplayRole = 'STATION' | 'CENTRAL' | 'UNASSIGNED';
+export type DisplayRole = 'STATION' | 'CENTRAL' | 'SCHEDULE' | 'UNASSIGNED';
 
 export interface Display {
   id:            string;
@@ -321,6 +321,8 @@ export interface PendingPair {
 
 // ---- Pair ----
 
+export type PairScreenType = 'STATION' | 'DASHBOARD' | 'CENTRAL' | 'SCHEDULE';
+
 export const pair = {
   pending(fetchFn?: typeof globalThis.fetch): Promise<PendingPair[]> {
     return request('GET', '/pair/pending', undefined, fetchFn);
@@ -330,7 +332,7 @@ export const pair = {
     pin:           string;
     label:         string;
     stationNumber: number;
-    screenType:    'STATION' | 'DASHBOARD';
+    screenType:    PairScreenType;
     isLandscape:   boolean;
   }): Promise<{ ok: boolean; clientId: string; label: string }> {
     return request('POST', '/pair/claim', data);

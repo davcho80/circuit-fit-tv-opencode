@@ -15,6 +15,7 @@
     type UpdateStatus,
     type Display,
     type DisplayRole,
+    type PairScreenType,
     type UserPublic,
     type PendingPair,
     type Diagnostics,
@@ -144,7 +145,7 @@
 
   // Modal appairage (déclenché par clic sur une TV découverte ou manuellement)
   let pairModal     = $state<{ pin: string; deviceModel?: string; deviceOs?: string } | null>(null);
-  let screenType    = $state<'STATION' | 'DASHBOARD'>('STATION');
+  let screenType    = $state<PairScreenType>('STATION');
   let label         = $state('Station 1');
   let stationNumber = $state(1);
   let isLandscape   = $state(true);
@@ -156,7 +157,8 @@
 
   $effect(() => {
     if (screenType === 'DASHBOARD') label = 'Central';
-    else if (label === 'Central') label = `Station ${stationNumber}`;
+    else if (screenType === 'SCHEDULE') label = 'Calendrier';
+    else if (label === 'Central' || label === 'Calendrier') label = `Station ${stationNumber}`;
   });
   $effect(() => {
     if (screenType === 'STATION') label = `Station ${stationNumber}`;
@@ -275,12 +277,14 @@
   const ROLE_ICON: Record<DisplayRole, string> = {
     STATION:    '🏋️',
     CENTRAL:    '📊',
+    SCHEDULE:   '📅',
     UNASSIGNED: '❓',
   };
 
   const roleLabel = $derived<Record<DisplayRole, string>>({
     STATION:    'Station',
     CENTRAL:    'Central',
+    SCHEDULE:   'Calendrier',
     UNASSIGNED: t('admin.screens.unassigned'),
   });
 
@@ -712,6 +716,7 @@
                     <span class="text-xs px-2 py-0.5 rounded-full font-medium
                       {d.role === 'STATION'    ? 'bg-sky-900/50 text-sky-300' :
                        d.role === 'CENTRAL'    ? 'bg-violet-900/50 text-violet-300' :
+                       d.role === 'SCHEDULE'   ? 'bg-amber-900/50 text-amber-300' :
                                                  'bg-slate-800 text-slate-400'}">
                       {roleLabel[d.role]}{d.role === 'STATION' && d.stationNumber != null ? ` #${d.stationNumber}` : ''}
                     </span>
@@ -1210,12 +1215,13 @@
         <!-- Type d'écran -->
         <div>
           <p class="text-sm font-medium text-slate-300 mb-2">{t('admin.screens.typeLabel')}</p>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             {#each [
               { value: 'STATION',   icon: '🏋️', label: 'Station',   desc: t('admin.screens.stationDesc')   },
               { value: 'DASHBOARD', icon: '📊', label: 'Dashboard', desc: t('admin.screens.dashboardDesc') },
+              { value: 'SCHEDULE',  icon: '📅', label: 'Calendrier', desc: 'Horaire des cours' },
             ] as opt}
-              <button type="button" onclick={() => { screenType = opt.value as 'STATION' | 'DASHBOARD'; }}
+              <button type="button" onclick={() => { screenType = opt.value as PairScreenType; }}
                 class="flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-medium transition-all
                   {screenType === opt.value
                     ? 'border-sky-500 bg-sky-500/10 text-sky-300'
@@ -1338,10 +1344,11 @@
         </div>
         <div>
           <p class="text-sm font-medium text-slate-300 mb-2">{t('common.role')}</p>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-4 gap-2">
             {#each [
               { value: 'STATION',    icon: '🏋️', label: 'Station'                     },
               { value: 'CENTRAL',    icon: '📊', label: 'Central'                     },
+              { value: 'SCHEDULE',   icon: '📅', label: 'Calendrier'                  },
               { value: 'UNASSIGNED', icon: '❓', label: t('admin.screens.unassigned') },
             ] as opt}
               <button type="button" onclick={() => { editRole = opt.value as DisplayRole; }}

@@ -1,0 +1,1 @@
+ALTER TYPE "DisplayRole" ADD VALUE 'SCHEDULE';
