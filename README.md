@@ -185,6 +185,7 @@ Ouvrir `android-tv/` dans Android Studio et lancer sur un émulateur TV ou appar
 - [Spécification technique complète](docs/spec.docx)
 - [Architecture Decision Records](docs/adr/)
 - [Déploiement production locale](docs/deployment.md)
+- [Sécurité production](docs/security.md)
 
 ## Production locale
 
