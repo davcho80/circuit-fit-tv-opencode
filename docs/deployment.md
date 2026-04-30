@@ -11,6 +11,14 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 docker compose -f docker-compose.prod.yml --env-file .env.production logs -f backend
 ```
 
+Un assistant CLI peut aussi generer `.env.production` avec des questions et des secrets aleatoires:
+
+```bash
+npm run prod:setup
+```
+
+Si `.env.production` existe deja, la commande refuse de l'ecraser. Utiliser `npm run prod:setup -- --force` pour regenerer le fichier volontairement.
+
 Le service `migrate` applique automatiquement `prisma migrate deploy` avant le demarrage du backend. Pour relancer les migrations manuellement apres une intervention:
 
 ```bash

@@ -193,7 +193,7 @@ Le déploiement gym utilise `docker-compose.prod.yml` avec backend en `network_m
 Commandes principales :
 
 ```bash
-cp .env.production.example .env.production
+npm run prod:setup
 npm run prod:up
 npm run prod:logs
 npm run prod:backup
