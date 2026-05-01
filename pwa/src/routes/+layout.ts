@@ -11,7 +11,7 @@ import type { LayoutLoad } from './$types';
 // Routes accessibles sans authentification
 const PUBLIC_PREFIXES = ['/login', '/change-password', '/setup', '/tv', '/pair'];
 
-const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
 export const load: LayoutLoad = async ({ url, fetch }) => {
   const pathname = url.pathname;

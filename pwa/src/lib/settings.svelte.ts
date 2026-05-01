@@ -18,7 +18,7 @@ const defaults: StudioSettings = {
   timezone:     'America/Montreal',
 };
 
-const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
 const settings = $state<StudioSettings>({ ...defaults });
 

@@ -33,11 +33,11 @@ export default defineConfig({
         navigateFallback: '200.html',
         runtimeCaching: [
           {
-            // Les routes API sont servies à la racine par Fastify, pas sous /api.
+            // Les routes API sont isolées sous /api pour éviter les collisions avec les pages SPA.
             urlPattern: ({ url }) => [
-              '/circuits',
-              '/settings',
-              '/tv-schedule',
+              '/api/circuits',
+              '/api/settings',
+              '/api/tv-schedule',
             ].some((path) => url.pathname === path || url.pathname.startsWith(`${path}/`)),
             handler: 'NetworkFirst',
             options: {
@@ -75,20 +75,9 @@ export default defineConfig({
     // Permet aux appareils externes (téléphone, tablette) d'appeler l'API via
     // l'IP du Mac sur le port Vite (5173) sans avoir à connaître le port backend.
     proxy: {
+      '/api':        { target: 'http://localhost:3000', changeOrigin: true },
+      // Compatibilité pour les anciens service workers/bundles déjà ouverts.
       '/auth':       { target: 'http://localhost:3000', changeOrigin: true },
-      '/exercises':  { target: 'http://localhost:3000', changeOrigin: true },
-      '/circuits':   { target: 'http://localhost:3000', changeOrigin: true },
-      '/displays':   { target: 'http://localhost:3000', changeOrigin: true },
-      '/sessions':   { target: 'http://localhost:3000', changeOrigin: true },
-      '/schedules':  { target: 'http://localhost:3000', changeOrigin: true },
-      '/stats':      { target: 'http://localhost:3000', changeOrigin: true },
-      '/users':      { target: 'http://localhost:3000', changeOrigin: true },
-      '/settings':   { target: 'http://localhost:3000', changeOrigin: true },
-      '/update':     { target: 'http://localhost:3000', changeOrigin: true },
-      '/pair':       { target: 'http://localhost:3000', changeOrigin: true },
-      '/setup':      { target: 'http://localhost:3000', changeOrigin: true },
-      '/health':     { target: 'http://localhost:3000', changeOrigin: true },
-      '/tv-schedule':{ target: 'http://localhost:3000', changeOrigin: true },
       '/ws': {
         target: 'ws://localhost:3000',
         ws: true,

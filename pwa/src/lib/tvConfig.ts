@@ -12,6 +12,8 @@ export interface PairConfigPayload {
   logoUrl?: string | null;
 }
 
+export type TvConfigUpdatePayload = Omit<PairConfigPayload, 'tvSecret'>;
+
 export interface TvConfig {
   displayId: string;
   label: string;
@@ -72,6 +74,26 @@ export function saveTvConfig(payload: PairConfigPayload): TvConfig {
     mode: modeFor(payload.screenType),
     isLandscape: payload.isLandscape,
     tvSecret: payload.tvSecret,
+    primaryColor: payload.primaryColor ?? null,
+    logoUrl: payload.logoUrl ?? null,
+    savedAt: Date.now(),
+  };
+
+  storage()?.setItem(STORAGE_KEY, JSON.stringify(config));
+  return config;
+}
+
+export function updateTvConfig(payload: TvConfigUpdatePayload): TvConfig | null {
+  const current = loadTvConfig();
+  if (!current || current.displayId !== payload.displayId) return null;
+
+  const config: TvConfig = {
+    ...current,
+    label: payload.label,
+    stationNumber: payload.stationNumber,
+    screenType: normalizedScreenType(payload.screenType),
+    mode: modeFor(payload.screenType),
+    isLandscape: payload.isLandscape,
     primaryColor: payload.primaryColor ?? null,
     logoUrl: payload.logoUrl ?? null,
     savedAt: Date.now(),

@@ -105,16 +105,16 @@ await app.register(cors, {
 // JWT — doit être enregistré avant les routes protégées
 await app.register(jwtFastifyPlugin);
 
-// Hook d'auth global : n'applique l'auth QUE sur les routes API connues.
+// Hook d'auth global : n'applique l'auth QUE sur les routes API protégées.
 // Les pages SPA (/admin, /circuits, /, etc.) et les assets sont laissés passer
 // pour que le navigateur puisse charger le frontend sans token.
-const PUBLIC_API_EXACT    = new Set(['/health', '/displays/online']);
-const PUBLIC_API_PREFIXES = ['/auth/', '/setup/', '/pair/', '/ws', '/tv-schedule'];
+const PUBLIC_API_EXACT    = new Set(['/api/health', '/api/displays/online', '/api/settings']);
+const PUBLIC_API_PREFIXES = ['/api/auth/', '/api/setup/', '/api/pair/', '/api/tv-schedule'];
 // Préfixes des routes API qui nécessitent une authentification
 const PROTECTED_PREFIXES  = [
-  '/exercises', '/circuits', '/displays', '/sessions',
-  '/schedules', '/stats', '/users', '/settings', '/update',
-  '/diagnostics', '/audit-logs',
+  '/api/exercises', '/api/circuits', '/api/displays', '/api/sessions',
+  '/api/schedules', '/api/stats', '/api/users', '/api/settings', '/api/update',
+  '/api/diagnostics', '/api/audit-logs',
 ];
 
 app.addHook('onRequest', async (req, reply) => {
@@ -176,7 +176,7 @@ async function checkDatabase(): Promise<{ ok: boolean; error: string | null }> {
   }
 }
 
-app.get('/health', async () => {
+async function healthSnapshot() {
   const [db, storage] = await Promise.all([
     checkDatabase(),
     checkStorageBuckets(),
@@ -215,9 +215,12 @@ app.get('/health', async () => {
         }
       : null,
   };
-});
+}
 
-app.get('/diagnostics', { preHandler: [requireAdmin] }, async () => {
+app.get('/health', healthSnapshot);
+app.get('/api/health', healthSnapshot);
+
+app.get('/api/diagnostics', { preHandler: [requireAdmin] }, async () => {
   const [db, storage, displays] = await Promise.all([
     checkDatabase(),
     checkStorageBuckets(),
@@ -280,25 +283,26 @@ app.get('/diagnostics', { preHandler: [requireAdmin] }, async () => {
   };
 });
 
-// GET /displays/online — displayIds actuellement connectés
-app.get('/displays/online', () => {
+// GET /api/displays/online — displayIds actuellement connectés
+app.get('/api/displays/online', () => {
   return { onlineIds: [...hub.onlineDisplayIds()] };
 });
 
-await app.register(exercisesRoutes);
-await app.register(circuitsRoutes);
-await app.register(displaysRoutes);
-await app.register(sessionsRoutes);
-await app.register(pairRoutes);
-await app.register(schedulesRoutes);
-await app.register(statsRoutes);
+await app.register(exercisesRoutes, { prefix: '/api' });
+await app.register(circuitsRoutes, { prefix: '/api' });
+await app.register(displaysRoutes, { prefix: '/api' });
+await app.register(sessionsRoutes, { prefix: '/api' });
+await app.register(pairRoutes, { prefix: '/api' });
+await app.register(schedulesRoutes, { prefix: '/api' });
+await app.register(statsRoutes, { prefix: '/api' });
+await app.register(authRoutes, { prefix: '/api' });
 await app.register(authRoutes);
-await app.register(usersRoutes);
-await app.register(setupRoutes);
-await app.register(settingsRoutes);
-await app.register(tvScheduleRoutes);
-await app.register(updateRoutes);
-await app.register(auditLogsRoutes);
+await app.register(usersRoutes, { prefix: '/api' });
+await app.register(setupRoutes, { prefix: '/api' });
+await app.register(settingsRoutes, { prefix: '/api' });
+await app.register(tvScheduleRoutes, { prefix: '/api' });
+await app.register(updateRoutes, { prefix: '/api' });
+await app.register(auditLogsRoutes, { prefix: '/api' });
 
 // ---- WebSocket endpoint ----
 

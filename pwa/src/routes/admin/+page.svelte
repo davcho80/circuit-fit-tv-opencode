@@ -216,7 +216,7 @@
   }
 
   async function refreshScreens() {
-    const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+    const BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
     const [dl, or] = await Promise.all([
       displaysApi.list(),
       fetch(`${BASE}/displays/online`)
@@ -483,7 +483,7 @@
   function beginRestartPolling() {
     updatePhase = 'restarting';
     restartSecs = 0;
-    const API_BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+    const API_BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '/api';
     const ticker = setInterval(() => { restartSecs++; }, 1000);
     pollInterval = setInterval(async () => {
       try {

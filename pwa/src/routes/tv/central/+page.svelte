@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { createWsConnection } from '$lib/ws.svelte.js';
   import { circuits as api, type Circuit } from '$lib/api';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
-  import { loadTvConfig, type TvConfig } from '$lib/tvConfig.js';
+  import { loadTvConfig, screenRouteFor, updateTvConfig, type TvConfig, type TvConfigUpdatePayload } from '$lib/tvConfig.js';
   import {
     loadTvCircuitSnapshot,
     loadTvSessionSnapshot,
@@ -38,7 +39,21 @@
     conn = createWsConnection('tv', label, savedConfig ? {
       displayId: savedConfig.displayId,
       tvSecret: savedConfig.tvSecret,
+      onTvConfigUpdate: handleTvConfigUpdate,
     } : {});
+  }
+
+  function handleTvConfigUpdate(payload: TvConfigUpdatePayload) {
+    const config = updateTvConfig(payload);
+    if (!config) return;
+    savedConfig = config;
+    label = config.label;
+    const route = screenRouteFor(config);
+    if (route !== '/tv/central') {
+      goto(route);
+      return;
+    }
+    start();
   }
   onDestroy(() => conn?.destroy());
 

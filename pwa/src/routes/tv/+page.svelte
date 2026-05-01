@@ -9,7 +9,9 @@
     loadTvConfig,
     saveTvConfig,
     screenRouteFor,
+    updateTvConfig,
     type PairConfigPayload,
+    type TvConfigUpdatePayload,
     type TvConfig,
   } from '$lib/tvConfig.js';
   import {
@@ -61,6 +63,7 @@
     conn = createWsConnection('tv', config.label, {
       displayId: config.displayId,
       tvSecret: config.tvSecret,
+      onTvConfigUpdate: handleTvConfigUpdate,
     });
   }
 
@@ -77,6 +80,7 @@
     conn = createWsConnection('tv', label, savedConfig?.mode === 'station' ? {
       displayId: savedConfig.displayId,
       tvSecret: savedConfig.tvSecret,
+      onTvConfigUpdate: handleTvConfigUpdate,
     } : {});
   }
 
@@ -97,6 +101,26 @@
     conn = createWsConnection('tv', config.label, {
       displayId: config.displayId,
       tvSecret: config.tvSecret,
+      onTvConfigUpdate: handleTvConfigUpdate,
+    });
+  }
+
+  function handleTvConfigUpdate(payload: TvConfigUpdatePayload) {
+    const config = updateTvConfig(payload);
+    if (!config) return;
+    applyConfig(config);
+
+    const route = screenRouteFor(config);
+    if (route !== '/tv') {
+      goto(route);
+      return;
+    }
+
+    conn?.destroy();
+    conn = createWsConnection('tv', config.label, {
+      displayId: config.displayId,
+      tvSecret: config.tvSecret,
+      onTvConfigUpdate: handleTvConfigUpdate,
     });
   }
 

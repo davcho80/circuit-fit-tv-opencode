@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
   import { createWsConnection, type WsConnection } from '$lib/ws.svelte.js';
-  import { loadTvConfig, type TvConfig } from '$lib/tvConfig.js';
+  import { loadTvConfig, screenRouteFor, updateTvConfig, type TvConfig, type TvConfigUpdatePayload } from '$lib/tvConfig.js';
   import { loadTvScheduleSnapshot, saveTvScheduleSnapshot } from '$lib/tvOffline.js';
 
   // ---- Types ----
@@ -22,7 +23,7 @@
     classes:   ScheduledClass[];
   }
 
-  const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+  const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
   // ---- State ----
   let days        = $state<ScheduledDay[]>([]);
@@ -80,6 +81,7 @@
       conn = createWsConnection('tv', config.label, {
         displayId: config.displayId,
         tvSecret: config.tvSecret,
+        onTvConfigUpdate: handleTvConfigUpdate,
       });
     }
     applyBranding();
@@ -90,6 +92,23 @@
     clearInterval(refreshInterval);
     conn?.destroy();
   });
+
+  function handleTvConfigUpdate(payload: TvConfigUpdatePayload) {
+    const config = updateTvConfig(payload);
+    if (!config) return;
+    savedConfig = config;
+    const route = screenRouteFor(config);
+    if (route !== '/tv/schedule') {
+      goto(route);
+      return;
+    }
+    conn?.destroy();
+    conn = createWsConnection('tv', config.label, {
+      displayId: config.displayId,
+      tvSecret: config.tvSecret,
+      onTvConfigUpdate: handleTvConfigUpdate,
+    });
+  }
 
   // ---- Helpers ----
   const todayStr = $derived(now.toISOString().slice(0, 10));

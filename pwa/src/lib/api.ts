@@ -4,9 +4,9 @@
 // En prod, BASE_URL est vide (même origine)
 // ============================================================
 
-// En dev : VITE_API_URL vide → même origine, proxy Vite achemine vers le backend
-// En prod : vide → même origine (Fastify sert le frontend)
-const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+// En dev : VITE_API_URL vide → même origine, proxy Vite achemine /api vers le backend
+// En prod : vide → même origine (Fastify sert le frontend et l'API sous /api)
+const BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
 async function request<T>(method: string, path: string, body?: unknown, fetchFn: typeof globalThis.fetch = globalThis.fetch): Promise<T> {
   const headers: Record<string, string> = {};
@@ -269,7 +269,7 @@ export const stats = {
     return request('GET', '/stats', undefined, fetchFn);
   },
   exportCsvUrl(): string {
-    const BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+    const BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '/api';
     return `${BASE}/stats/export.csv`;
   },
 };
@@ -621,7 +621,7 @@ export const update = {
 
   /** Consomme le flux SSE de logs et appelle onLine pour chaque ligne, onDone à la fin */
   stream(onLine: (line: string) => void, onDone: () => void): () => void {
-    const base: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+    const base: string = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '/api';
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('cfitv_token') : null;
 
     const ctrl = new AbortController();

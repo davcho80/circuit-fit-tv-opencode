@@ -120,14 +120,17 @@
 {:else}
   <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
 
-    <nav class="bg-slate-900 border-b border-slate-800 flex items-center shrink-0">
+    <nav class="bg-slate-900 border-b border-slate-800 flex flex-wrap items-center shrink-0">
+
+      <a
+        href="/"
+        class="font-bold text-sky-400 text-lg tracking-tight px-4 py-2.5 hover:text-sky-300 transition-colors shrink min-w-0 max-w-[calc(100vw-9rem)] truncate sm:max-w-none sm:shrink-0"
+      >
+        {studioSettings.studioName}
+      </a>
 
       <!-- Zone liens scrollable -->
-      <div class="flex items-center gap-1 px-4 py-2.5 overflow-x-auto flex-1 min-w-0">
-        <a href="/" class="font-bold text-sky-400 text-lg tracking-tight px-2 mr-1 hover:text-sky-300 transition-colors shrink-0">
-          {studioSettings.studioName}
-        </a>
-
+      <div class="order-3 flex w-full items-center gap-1 px-3 pb-2 overflow-x-auto border-t border-slate-800/70 sm:order-none sm:w-auto sm:flex-1 sm:min-w-0 sm:border-t-0 sm:px-0 sm:py-2.5">
         {#each nav as item}
           <a
             href={item.href}
@@ -156,7 +159,7 @@
       </div>
 
       <!-- Zone droite fixe : langue + user menu -->
-      <div class="flex items-center gap-1 px-3 py-2 shrink-0">
+      <div class="ml-auto flex items-center gap-1 px-3 py-2 shrink-0">
 
         <!-- Switcher langue -->
         {#if installPrompt && !isStandalone}

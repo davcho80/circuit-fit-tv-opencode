@@ -6,10 +6,10 @@
 // - Heartbeat toutes les 10 s
 // ============================================================
 
-import type { PairConfigPayload } from './tvConfig.js';
+import type { PairConfigPayload, TvConfigUpdatePayload } from './tvConfig.js';
 import { saveTvSessionSnapshot } from './tvOffline.js';
 
-const WS_URL = (import.meta.env['VITE_API_URL'] as string | undefined ?? 'http://localhost:3000')
+const WS_URL = ((import.meta.env['VITE_API_URL'] as string | undefined) ?? `${globalThis.location?.origin ?? 'http://localhost:3000'}`)
   .replace(/^http/, 'ws') + '/ws';
 
 function getWsAuthToken(role: 'tv' | 'coach' | 'monitor'): string | undefined {
@@ -72,6 +72,7 @@ export interface WsConnectionOptions {
   displayId?: string;
   tvSecret?: string;
   onPairConfig?: (config: PairConfigPayload) => void;
+  onTvConfigUpdate?: (config: TvConfigUpdatePayload) => void;
 }
 
 export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: string, options: WsConnectionOptions = {}) {
@@ -167,6 +168,17 @@ export function createWsConnection(role: 'tv' | 'coach' | 'monitor', label: stri
           screenType: msg['screenType'] as PairConfigPayload['screenType'],
           isLandscape: msg['isLandscape'] as boolean,
           tvSecret: msg['tvSecret'] as string,
+          primaryColor: (msg['primaryColor'] as string | undefined) ?? null,
+          logoUrl: (msg['logoUrl'] as string | null | undefined) ?? null,
+        });
+        break;
+      case 'TV_CONFIG_UPDATE':
+        options.onTvConfigUpdate?.({
+          displayId: msg['displayId'] as string,
+          label: msg['label'] as string,
+          stationNumber: msg['stationNumber'] as number,
+          screenType: msg['screenType'] as TvConfigUpdatePayload['screenType'],
+          isLandscape: msg['isLandscape'] as boolean,
           primaryColor: (msg['primaryColor'] as string | undefined) ?? null,
           logoUrl: (msg['logoUrl'] as string | null | undefined) ?? null,
         });

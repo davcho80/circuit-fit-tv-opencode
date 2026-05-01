@@ -258,6 +258,19 @@ export const PairConfigMsg = z.object({
   logoUrl:      z.string().nullable().optional(),
 });
 
+// Serveur → TV : mise à jour de config d'un écran déjà appairé.
+// Le secret TV reste local à l'appareil et n'est pas renvoyé.
+export const TvConfigUpdateMsg = z.object({
+  type:          z.literal('TV_CONFIG_UPDATE'),
+  displayId:     z.string().uuid(),
+  label:         z.string().min(1).max(50),
+  stationNumber: z.number().int().min(1).max(20),
+  screenType:    z.enum(['STATION', 'DASHBOARD', 'CENTRAL', 'SCHEDULE']),
+  isLandscape:   z.boolean(),
+  primaryColor:  z.string().optional(),
+  logoUrl:       z.string().nullable().optional(),
+});
+
 export const ServerMessage = z.discriminatedUnion('type', [
   WelcomeMsg,
   ClockPongMsg,
@@ -272,6 +285,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   DriftDataMsg,
   ErrorMsg,
   PairConfigMsg,
+  TvConfigUpdateMsg,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 

@@ -1,6 +1,6 @@
 import { displays, users, type Display, type UserPublic } from '$lib/api.js';
 
-const BASE: string = import.meta.env['VITE_API_URL'] ?? '';
+const BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
 export async function load({ fetch }: { fetch: typeof globalThis.fetch }) {
   const [displayList, onlineRes, userList] = await Promise.all([

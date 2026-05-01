@@ -13,6 +13,7 @@ import { Display } from '@cfitv/shared';
 import { prisma } from '../db.js';
 import { requireAdmin } from '../auth/jwt.plugin.js';
 import { auditLog } from '../audit.js';
+import { hub } from '../ws/hub.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function stripUndefined(obj: Record<string, unknown>): any {
@@ -47,6 +48,12 @@ const displayPublicSelect = {
   appVersion:    true,
   pairedAt:      true,
 } as const;
+
+function screenTypeForRole(role: string): 'STATION' | 'CENTRAL' | 'SCHEDULE' {
+  if (role === 'CENTRAL') return 'CENTRAL';
+  if (role === 'SCHEDULE') return 'SCHEDULE';
+  return 'STATION';
+}
 
 export async function displaysRoutes(app: FastifyInstance): Promise<void> {
   // GET /displays
@@ -98,6 +105,14 @@ export async function displaysRoutes(app: FastifyInstance): Promise<void> {
       targetId:   updated.id,
       metadata:   { fields: Object.keys(stripUndefined(body.data)), name: updated.name, role: updated.role },
     });
+    hub.broadcast({
+      type:          'TV_CONFIG_UPDATE',
+      displayId:     updated.id,
+      label:         updated.name,
+      stationNumber: updated.stationNumber ?? 1,
+      screenType:    screenTypeForRole(updated.role),
+      isLandscape:   true,
+    }, (client) => client.role === 'tv' && client.displayId === updated.id);
     return updated;
   });
 

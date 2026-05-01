@@ -7,6 +7,7 @@
   let confirmPassword = $state('');
   let error           = $state('');
   let loading         = $state(false);
+  const API_BASE: string = import.meta.env['VITE_API_URL'] ?? '/api';
 
   const rules = $derived({
     length:  password.length >= 8,
@@ -24,7 +25,7 @@
     error   = '';
     loading = true;
     try {
-      const res = await fetch('/setup', {
+      const res = await fetch(`${API_BASE}/setup`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email, password }),
