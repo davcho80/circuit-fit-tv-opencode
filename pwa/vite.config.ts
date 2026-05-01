@@ -2,6 +2,18 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { defineConfig } from 'vite';
+import type { IncomingMessage } from 'node:http';
+
+const backendTarget = 'http://localhost:3000';
+const legacyApiProxy = {
+  target: backendTarget,
+  changeOrigin: true,
+  rewrite: (path: string) => `/api${path}`,
+  bypass(req: IncomingMessage) {
+    const accept = req.headers.accept ?? '';
+    return accept.includes('text/html') ? req.url : undefined;
+  },
+};
 
 export default defineConfig({
   plugins: [
@@ -75,9 +87,21 @@ export default defineConfig({
     // Permet aux appareils externes (téléphone, tablette) d'appeler l'API via
     // l'IP du Mac sur le port Vite (5173) sans avoir à connaître le port backend.
     proxy: {
-      '/api':        { target: 'http://localhost:3000', changeOrigin: true },
+      '/api':        { target: backendTarget, changeOrigin: true },
       // Compatibilité pour les anciens service workers/bundles déjà ouverts.
-      '/auth':       { target: 'http://localhost:3000', changeOrigin: true },
+      '/auth':       { target: backendTarget, changeOrigin: true },
+      '/setup':      legacyApiProxy,
+      '/exercises':  legacyApiProxy,
+      '/circuits':   legacyApiProxy,
+      '/displays':   legacyApiProxy,
+      '/sessions':   legacyApiProxy,
+      '/schedules':  legacyApiProxy,
+      '/stats':      legacyApiProxy,
+      '/users':      legacyApiProxy,
+      '/settings':   legacyApiProxy,
+      '/update':     legacyApiProxy,
+      '/pair':       legacyApiProxy,
+      '/tv-schedule': legacyApiProxy,
       '/ws': {
         target: 'ws://localhost:3000',
         ws: true,
