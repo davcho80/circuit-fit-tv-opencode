@@ -103,9 +103,20 @@
   }
 
   // ---- Gestion des stations ----
+  function defaultStation(mode: 'TIME' | 'REPS' = 'TIME'): LocalStation {
+    return { exerciseIds: [], stationMode: mode, sets: 3, reps: 10, restBetweenSetsSec: 60 };
+  }
+
   function addStation() {
     if (stations.length >= 20) return;
-    stations = [...stations, { exerciseIds: [], stationMode: 'TIME', sets: 3, reps: 10, restBetweenSetsSec: 60 }];
+    const previousMode = stations.at(-1)?.stationMode ?? 'TIME';
+    stations = [...stations, defaultStation(previousMode)];
+  }
+
+  function setStationMode(idx: number, mode: 'TIME' | 'REPS') {
+    stations = stations.map((station, i) => (
+      i === idx ? { ...station, stationMode: mode } : station
+    ));
   }
 
   function removeStation(idx: number) {
@@ -155,7 +166,20 @@
   let isValid = $derived(
     name.trim().length > 0 &&
     stations.length >= 2 &&
-    stations.every((s) => s.exerciseIds.length > 0),
+    stations.every((s) => (
+      s.exerciseIds.length > 0 &&
+      (s.stationMode === 'TIME' || (
+        Number.isInteger(s.sets) &&
+        Number.isInteger(s.reps) &&
+        Number.isInteger(s.restBetweenSetsSec) &&
+        s.sets >= 1 &&
+        s.sets <= 20 &&
+        s.reps >= 1 &&
+        s.reps <= 200 &&
+        s.restBetweenSetsSec >= 0 &&
+        s.restBetweenSetsSec <= 600
+      ))
+    )),
   );
 
   async function handleSubmit(e: SubmitEvent) {
@@ -521,7 +545,7 @@
               <div class="flex rounded-lg overflow-hidden border border-slate-700 shrink-0">
                 <button
                   type="button"
-                  onclick={() => { station.stationMode = 'TIME'; }}
+                  onclick={() => setStationMode(idx, 'TIME')}
                   class="px-2.5 py-1 text-xs font-medium transition-colors
                          {station.stationMode === 'TIME'
                            ? 'bg-sky-600 text-white'
@@ -529,12 +553,12 @@
                 >Temps</button>
                 <button
                   type="button"
-                  onclick={() => { station.stationMode = 'REPS'; }}
+                  onclick={() => setStationMode(idx, 'REPS')}
                   class="px-2.5 py-1 text-xs font-medium transition-colors
                          {station.stationMode === 'REPS'
                            ? 'bg-violet-600 text-white'
                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
-                >Reps</button>
+                >Sets & reps</button>
               </div>
 
               {#if station.stationMode === 'REPS'}
