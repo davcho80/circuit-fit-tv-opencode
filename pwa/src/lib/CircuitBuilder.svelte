@@ -36,21 +36,13 @@
   // Stations locales
   interface LocalStation {
     exerciseIds: string[];
-    stationMode: 'TIME' | 'REPS';
-    sets: number;
-    reps: number;
-    restBetweenSetsSec: number;
   }
   let stations = $state<LocalStation[]>(
     initial?.stations.map((s) => ({
-      exerciseIds:       s.exercises.map((e) => e.exercise.id),
-      stationMode:       s.stationMode ?? 'TIME',
-      sets:              s.sets ?? 3,
-      reps:              s.reps ?? 10,
-      restBetweenSetsSec: s.restBetweenSetsSec ?? 60,
+      exerciseIds: s.exercises.map((e) => e.exercise.id),
     })) ?? [
-      { exerciseIds: [], stationMode: 'TIME', sets: 3, reps: 10, restBetweenSetsSec: 60 },
-      { exerciseIds: [], stationMode: 'TIME', sets: 3, reps: 10, restBetweenSetsSec: 60 },
+      { exerciseIds: [] },
+      { exerciseIds: [] },
     ],
   );
 
@@ -103,20 +95,13 @@
   }
 
   // ---- Gestion des stations ----
-  function defaultStation(mode: 'TIME' | 'REPS' = 'TIME'): LocalStation {
-    return { exerciseIds: [], stationMode: mode, sets: 3, reps: 10, restBetweenSetsSec: 60 };
+  function defaultStation(): LocalStation {
+    return { exerciseIds: [] };
   }
 
   function addStation() {
     if (stations.length >= 20) return;
-    const previousMode = stations.at(-1)?.stationMode ?? 'TIME';
-    stations = [...stations, defaultStation(previousMode)];
-  }
-
-  function setStationMode(idx: number, mode: 'TIME' | 'REPS') {
-    stations = stations.map((station, i) => (
-      i === idx ? { ...station, stationMode: mode } : station
-    ));
+    stations = [...stations, defaultStation()];
   }
 
   function removeStation(idx: number) {
@@ -166,20 +151,7 @@
   let isValid = $derived(
     name.trim().length > 0 &&
     stations.length >= 2 &&
-    stations.every((s) => (
-      s.exerciseIds.length > 0 &&
-      (s.stationMode === 'TIME' || (
-        Number.isInteger(s.sets) &&
-        Number.isInteger(s.reps) &&
-        Number.isInteger(s.restBetweenSetsSec) &&
-        s.sets >= 1 &&
-        s.sets <= 20 &&
-        s.reps >= 1 &&
-        s.reps <= 200 &&
-        s.restBetweenSetsSec >= 0 &&
-        s.restBetweenSetsSec <= 600
-      ))
-    )),
+    stations.every((s) => s.exerciseIds.length > 0),
   );
 
   async function handleSubmit(e: SubmitEvent) {
@@ -204,10 +176,10 @@
         stations: stations.map((s, i) => ({
           position:          i + 1,
           exerciseIds:       s.exerciseIds,
-          stationMode:       s.stationMode,
-          sets:              s.stationMode === 'REPS' ? s.sets : null,
-          reps:              s.stationMode === 'REPS' ? s.reps : null,
-          restBetweenSetsSec: s.stationMode === 'REPS' ? s.restBetweenSetsSec : null,
+          stationMode:       'TIME',
+          sets:              null,
+          reps:              null,
+          restBetweenSetsSec: null,
         })),
         scheduledBreaks: scheduledBreaks.map((b) => ({ afterRound: b.afterRound, durationSec: b.durationSec, label: 'Pause eau' })),
       });
@@ -487,7 +459,7 @@
         {#each stations as station, idx (idx)}
           {@const hasEx = station.exerciseIds.length > 0}
           <div class="bg-slate-900 border rounded-xl transition-colors
-                      {hasEx ? (station.stationMode === 'REPS' ? 'border-violet-700/60' : 'border-slate-700') : 'border-amber-700/50'}">
+                      {hasEx ? 'border-slate-700' : 'border-amber-700/50'}">
             <div class="flex items-center gap-3 p-3">
               <!-- Numéro -->
               <span class="text-slate-500 font-mono text-sm w-6 shrink-0 text-center">
@@ -539,71 +511,10 @@
               </div>
             </div>
 
-            <!-- Sélection mode + config REPS -->
-            <div class="border-t border-slate-800 px-3 py-2 flex items-center gap-3 flex-wrap">
-              <!-- Toggle TIME / REPS -->
-              <div class="flex rounded-lg overflow-hidden border border-slate-700 shrink-0">
-                <button
-                  type="button"
-                  onclick={() => setStationMode(idx, 'TIME')}
-                  class="px-2.5 py-1 text-xs font-medium transition-colors
-                         {station.stationMode === 'TIME'
-                           ? 'bg-sky-600 text-white'
-                           : 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
-                >Temps</button>
-                <button
-                  type="button"
-                  onclick={() => setStationMode(idx, 'REPS')}
-                  class="px-2.5 py-1 text-xs font-medium transition-colors
-                         {station.stationMode === 'REPS'
-                           ? 'bg-violet-600 text-white'
-                           : 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
-                >Sets & reps</button>
-              </div>
-
-              {#if station.stationMode === 'REPS'}
-                <!-- Sets -->
-                <label class="flex items-center gap-1.5 text-xs text-slate-400">
-                  Sets
-                  <input
-                    type="number" min="1" max="20"
-                    bind:value={station.sets}
-                    class="w-14 bg-slate-800 border border-slate-700 rounded px-2 py-1
-                           text-slate-100 text-xs text-center focus:outline-none focus:border-violet-500"
-                  />
-                </label>
-                <!-- Reps -->
-                <label class="flex items-center gap-1.5 text-xs text-slate-400">
-                  ×
-                  <input
-                    type="number" min="1" max="200"
-                    bind:value={station.reps}
-                    class="w-14 bg-slate-800 border border-slate-700 rounded px-2 py-1
-                           text-slate-100 text-xs text-center focus:outline-none focus:border-violet-500"
-                  />
-                  reps
-                </label>
-                <!-- Repos entre sets -->
-                <label class="flex items-center gap-1.5 text-xs text-slate-400 ml-1">
-                  Repos
-                  <select
-                    bind:value={station.restBetweenSetsSec}
-                    class="bg-slate-800 border border-slate-700 rounded px-2 py-1
-                           text-slate-100 text-xs focus:outline-none focus:border-violet-500"
-                  >
-                    {#each [[30,'30 s'],[45,'45 s'],[60,'1 min'],[90,'1 min 30'],[120,'2 min'],[180,'3 min']] as [s, lbl]}
-                      <option value={s}>{lbl}</option>
-                    {/each}
-                  </select>
-                </label>
-                <span class="text-xs text-violet-400 font-medium ml-auto">
-                  {station.sets}×{station.reps}
-                </span>
-              {:else}
-                <span class="text-xs text-slate-500">
-                  {workSec}s travail · {restSec}s repos
-                </span>
-              {/if}
+            <div class="border-t border-slate-800 px-3 py-2">
+              <span class="text-xs text-slate-500">
+                {workSec}s travail · {restSec}s repos
+              </span>
             </div>
           </div>
         {/each}
