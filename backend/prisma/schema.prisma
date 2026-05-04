@@ -158,6 +158,8 @@ model CircuitStationExercise {
   stationId  String
   exercise   Exercise       @relation(fields: [exerciseId], references: [id])
   exerciseId String
+  sets       Int?
+  reps       Int?
 
   @@id([stationId, exerciseId])
 }

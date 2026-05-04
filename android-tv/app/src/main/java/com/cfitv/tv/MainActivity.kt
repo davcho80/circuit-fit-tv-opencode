@@ -2,7 +2,11 @@ package com.cfitv.tv
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.graphics.Color
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -24,12 +28,22 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : Activity() {
+    private companion object {
+        const val SERVICE_TYPE = "_cfitv._tcp."
+        const val TV_PATH = "/tv"
+        const val DISCOVERY_TIMEOUT_MS = 12_000L
+    }
+
     private lateinit var webView: WebView
     private lateinit var statusPanel: LinearLayout
     private lateinit var statusTitle: TextView
     private lateinit var statusDetail: TextView
     private lateinit var retryButton: Button
     private val timeoutHandler = Handler(Looper.getMainLooper())
+    private val nsdManager by lazy { getSystemService(NSD_SERVICE) as NsdManager }
+    private var discoveryListener: NsdManager.DiscoveryListener? = null
+    private var resolveInProgress = false
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,11 +77,13 @@ class MainActivity : Activity() {
         ))
 
         setContentView(root)
-        loadTvUrl()
+        start()
     }
 
     override fun onDestroy() {
         timeoutHandler.removeCallbacksAndMessages(null)
+        stopDiscovery()
+        releaseMulticastLock()
         super.onDestroy()
     }
 
@@ -140,7 +156,7 @@ class MainActivity : Activity() {
         }
         retryButton = Button(this).apply {
             text = "Reessayer"
-            setOnClickListener { loadTvUrl() }
+            setOnClickListener { start() }
         }
 
         panel.addView(statusTitle)
@@ -149,23 +165,123 @@ class MainActivity : Activity() {
         return panel
     }
 
-    private fun loadTvUrl() {
+    private fun start() {
+        val configuredUrl = BuildConfig.CFITV_TV_URL.trim()
+        if (configuredUrl.isNotEmpty()) {
+            loadTvUrl(configuredUrl)
+        } else {
+            discoverServer()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun discoverServer() {
+        webView.stopLoading()
+        stopDiscovery()
+        acquireMulticastLock()
         showStatus(
-            "Chargement de Circuit Fit TV",
-            "URL: ${BuildConfig.CFITV_TV_URL}",
+            "Recherche du serveur Circuit Fit TV",
+            "Assurez-vous que la TV et le serveur sont sur le meme reseau Wi-Fi.\n\nService recherche: $SERVICE_TYPE",
             showRetry = false,
         )
-        webView.loadUrl(BuildConfig.CFITV_TV_URL)
+
+        resolveInProgress = false
+        val listener = object : NsdManager.DiscoveryListener {
+            override fun onDiscoveryStarted(serviceType: String) = Unit
+
+            override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                if (serviceInfo.serviceType != SERVICE_TYPE || resolveInProgress) return
+                resolveInProgress = true
+                nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
+                    override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                        resolveInProgress = false
+                    }
+
+                    override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                        val host = serviceInfo.host?.hostAddress
+                        val port = serviceInfo.port
+                        if (host.isNullOrBlank() || port <= 0) {
+                            resolveInProgress = false
+                            return
+                        }
+                        runOnUiThread { loadTvUrl("http://$host:$port$TV_PATH") }
+                    }
+                })
+            }
+
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
+
+            override fun onDiscoveryStopped(serviceType: String) = Unit
+
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                runOnUiThread { showDiscoveryError("La recherche reseau n'a pas pu demarrer. Code: $errorCode") }
+                stopDiscovery()
+            }
+
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
+                stopDiscovery()
+            }
+        }
+
+        discoveryListener = listener
+        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
+        timeoutHandler.removeCallbacksAndMessages(null)
+        timeoutHandler.postDelayed({
+            if (statusPanel.visibility == View.VISIBLE) {
+                showDiscoveryError("Aucun serveur detecte automatiquement.")
+            }
+        }, DISCOVERY_TIMEOUT_MS)
+    }
+
+    private fun loadTvUrl(url: String) {
+        stopDiscovery()
+        showStatus(
+            "Chargement de Circuit Fit TV",
+            "URL: $url",
+            showRetry = false,
+        )
+        webView.loadUrl(url)
         timeoutHandler.removeCallbacksAndMessages(null)
         timeoutHandler.postDelayed({
             if (statusPanel.visibility == View.VISIBLE) {
                 showStatus(
                     "Circuit Fit TV ne repond pas encore",
-                    "Verifiez que la tablette est sur le meme reseau que le serveur et que cfitvTvUrl pointe vers l'adresse IP du Mac.\n\nURL: ${BuildConfig.CFITV_TV_URL}",
+                    "Verifiez que la TV et le serveur sont sur le meme reseau, puis reessayez.\n\nURL: $url",
                     showRetry = true,
                 )
             }
         }, 8_000)
+    }
+
+    private fun showDiscoveryError(message: String) {
+        showStatus(
+            "Serveur Circuit Fit TV introuvable",
+            "$message\n\nDemarrez le serveur Circuit Fit TV et verifiez que le reseau autorise la decouverte locale (mDNS).",
+            showRetry = true,
+        )
+    }
+
+    private fun stopDiscovery() {
+        val listener = discoveryListener ?: return
+        discoveryListener = null
+        resolveInProgress = false
+        runCatching { nsdManager.stopServiceDiscovery(listener) }
+    }
+
+    private fun acquireMulticastLock() {
+        if (multicastLock?.isHeld == true) return
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return
+        multicastLock = wifiManager.createMulticastLock("cfitv-mdns").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        multicastLock?.let { lock ->
+            if (lock.isHeld) lock.release()
+        }
+        multicastLock = null
     }
 
     private fun showStatus(title: String, detail: String, showRetry: Boolean) {

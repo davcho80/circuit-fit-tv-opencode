@@ -140,7 +140,7 @@ export interface CircuitStationData {
   sets: number | null;
   reps: number | null;
   restBetweenSetsSec: number | null;
-  exercises: Array<{ exercise: Exercise }>;
+  exercises: Array<{ exercise: Exercise; sets: number | null; reps: number | null }>;
 }
 
 export interface ScheduledBreak {
@@ -179,6 +179,7 @@ export interface Circuit {
 export interface CircuitStationInput {
   position: number;
   exerciseIds: string[];
+  exerciseConfigs?: Array<{ exerciseId: string; sets: number; reps: number }>;
   layoutX?: number | null;
   layoutY?: number | null;
   stationMode?: 'TIME' | 'REPS';
@@ -237,7 +238,7 @@ export const circuits = {
 
   updateStations(
     id: string,
-    stations: Array<{ position: number; exerciseIds: string[]; layoutX?: number | null; layoutY?: number | null }>,
+    stations: CircuitStationInput[],
   ): Promise<Circuit> {
     return request('PUT', `/circuits/${id}/stations`, { stations });
   },

@@ -12,7 +12,7 @@ Cette note resume l'etat de securite attendu pour un deploiement local de gym.
 
 ## Sessions coach/admin
 
-- Les JWT expirent par defaut apres `8h`.
+- Les JWT expirent par defaut apres `30d`.
 - La duree est configurable avec `JWT_EXPIRES_IN`.
 - La PWA lit `exp`, affiche l'echeance dans le menu utilisateur et supprime le token expire.
 - Sur tablette partagee, preferer une duree courte et former les coachs a utiliser `Logout`.

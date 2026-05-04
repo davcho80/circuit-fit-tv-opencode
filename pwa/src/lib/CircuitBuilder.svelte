@@ -34,15 +34,27 @@
   let rotationMode = $state<'CLASSIC' | 'FIXED'>(initial?.rotationMode ?? 'CLASSIC');
 
   // Stations locales
+  interface LocalExerciseConfig {
+    exerciseId: string;
+    setsEnabled: boolean;
+    sets: number;
+    reps: number;
+  }
+
   interface LocalStation {
-    exerciseIds: string[];
+    exercises: LocalExerciseConfig[];
   }
   let stations = $state<LocalStation[]>(
     initial?.stations.map((s) => ({
-      exerciseIds: s.exercises.map((e) => e.exercise.id),
+      exercises: s.exercises.map((e) => ({
+        exerciseId: e.exercise.id,
+        setsEnabled: e.sets !== null && e.reps !== null,
+        sets: e.sets ?? 3,
+        reps: e.reps ?? 10,
+      })),
     })) ?? [
-      { exerciseIds: [] },
-      { exerciseIds: [] },
+      { exercises: [] },
+      { exercises: [] },
     ],
   );
 
@@ -86,17 +98,17 @@
   }
 
   function toggleExercise(stationIdx: number, exerciseId: string) {
-    const ids = stations[stationIdx]!.exerciseIds;
-    if (ids.includes(exerciseId)) {
-      stations[stationIdx]!.exerciseIds = ids.filter((id) => id !== exerciseId);
+    const selected = stations[stationIdx]!.exercises;
+    if (selected.some((config) => config.exerciseId === exerciseId)) {
+      stations[stationIdx]!.exercises = selected.filter((config) => config.exerciseId !== exerciseId);
     } else {
-      stations[stationIdx]!.exerciseIds = [...ids, exerciseId];
+      stations[stationIdx]!.exercises = [...selected, { exerciseId, setsEnabled: false, sets: 3, reps: 10 }];
     }
   }
 
   // ---- Gestion des stations ----
   function defaultStation(): LocalStation {
-    return { exerciseIds: [] };
+    return { exercises: [] };
   }
 
   function addStation() {
@@ -130,10 +142,14 @@
   }
 
   function stationLabel(s: LocalStation): string {
-    if (s.exerciseIds.length === 0) return t('cb.noExercise');
-    return s.exerciseIds
-      .map((id) => exerciseById(id)?.name ?? '?')
+    if (s.exercises.length === 0) return t('cb.noExercise');
+    return s.exercises
+      .map((config) => exerciseById(config.exerciseId)?.name ?? '?')
       .join(' / ');
+  }
+
+  function stationExerciseIds(s: LocalStation): string[] {
+    return s.exercises.map((config) => config.exerciseId);
   }
 
   // ---- Durée estimée ----
@@ -151,7 +167,20 @@
   let isValid = $derived(
     name.trim().length > 0 &&
     stations.length >= 2 &&
-    stations.every((s) => s.exerciseIds.length > 0),
+    stations.every((s) => (
+      s.exercises.length > 0 &&
+      s.exercises.every((config) => (
+        !config.setsEnabled ||
+        (
+          Number.isInteger(config.sets) &&
+          Number.isInteger(config.reps) &&
+          config.sets >= 1 &&
+          config.sets <= 20 &&
+          config.reps >= 1 &&
+          config.reps <= 200
+        )
+      ))
+    )),
   );
 
   async function handleSubmit(e: SubmitEvent) {
@@ -175,7 +204,14 @@
         rotationMode,
         stations: stations.map((s, i) => ({
           position:          i + 1,
-          exerciseIds:       s.exerciseIds,
+          exerciseIds:       stationExerciseIds(s),
+          exerciseConfigs:   s.exercises
+            .filter((config) => config.setsEnabled)
+            .map((config) => ({
+              exerciseId: config.exerciseId,
+              sets:       config.sets,
+              reps:       config.reps,
+            })),
           stationMode:       'TIME',
           sets:              null,
           reps:              null,
@@ -430,7 +466,7 @@
                text-white font-semibold py-3 rounded-lg transition-colors text-sm"
       >
         {#if saving}{t('cb.saving')}
-        {:else if !isValid && stations.some((s) => s.exerciseIds.length === 0)}
+        {:else if !isValid && stations.some((s) => s.exercises.length === 0)}
           {t('cb.assignAll')}
         {:else}
           {submitLabel}
@@ -457,7 +493,7 @@
 
       <div class="space-y-2">
         {#each stations as station, idx (idx)}
-          {@const hasEx = station.exerciseIds.length > 0}
+          {@const hasEx = station.exercises.length > 0}
           <div class="bg-slate-900 border rounded-xl transition-colors
                       {hasEx ? 'border-slate-700' : 'border-amber-700/50'}">
             <div class="flex items-center gap-3 p-3">
@@ -472,10 +508,10 @@
                 onclick={() => openPicker(idx)}
                 class="flex-1 text-left min-w-0"
               >
-                {#if station.exerciseIds.length > 0}
+                {#if station.exercises.length > 0}
                   <div class="flex items-center gap-2 flex-wrap">
-                    {#each station.exerciseIds as exId}
-                      {@const ex = exerciseById(exId)}
+                    {#each station.exercises as config}
+                      {@const ex = exerciseById(config.exerciseId)}
                       {#if ex}
                         <div class="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2 py-1">
                           {#if ex.thumbnailUrl}
@@ -516,6 +552,54 @@
                 {workSec}s travail · {restSec}s repos
               </span>
             </div>
+
+            {#if station.exercises.length > 0}
+              <div class="border-t border-slate-800 px-3 py-2 space-y-2">
+                {#each station.exercises as config (config.exerciseId)}
+                  {@const ex = exerciseById(config.exerciseId)}
+                  {#if ex}
+                    <div class="flex flex-wrap items-center gap-2 rounded-lg bg-slate-950/50 px-2 py-2">
+                      <label class="flex items-center gap-2 min-w-0 text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          bind:checked={config.setsEnabled}
+                          class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500"
+                        />
+                        <span class="truncate max-w-[130px]">{ex.name}</span>
+                        <span class="text-slate-500">set et rep</span>
+                      </label>
+
+                      {#if config.setsEnabled}
+                        <div class="ml-auto flex items-center gap-1.5">
+                          <label class="flex items-center gap-1 text-xs text-slate-400">
+                            Sets
+                            <input
+                              type="number"
+                              min="1"
+                              max="20"
+                              bind:value={config.sets}
+                              class="w-14 bg-slate-800 border border-slate-700 rounded px-2 py-1
+                                     text-slate-100 text-xs text-center focus:outline-none focus:border-sky-500"
+                            />
+                          </label>
+                          <label class="flex items-center gap-1 text-xs text-slate-400">
+                            Reps
+                            <input
+                              type="number"
+                              min="1"
+                              max="200"
+                              bind:value={config.reps}
+                              class="w-14 bg-slate-800 border border-slate-700 rounded px-2 py-1
+                                     text-slate-100 text-xs text-center focus:outline-none focus:border-sky-500"
+                            />
+                          </label>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -526,7 +610,7 @@
 <!-- ======== PICKER D'EXERCICES (overlay) ======== -->
 {#if pickerOpenIdx !== null}
   {@const idx = pickerOpenIdx}
-  {@const selected = stations[idx]?.exerciseIds ?? []}
+  {@const selected = stationExerciseIds(stations[idx] ?? defaultStation())}
 
   <!-- Backdrop -->
   <div

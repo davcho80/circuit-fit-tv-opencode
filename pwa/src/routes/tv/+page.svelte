@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import QRCode from 'qrcode';
   import { createWsConnection, type WsConnection } from '$lib/ws.svelte.js';
   import { circuits as api, type Circuit, type Exercise } from '$lib/api';
   import { studioSettings, loadSettings, applyBranding } from '$lib/settings.svelte.js';
@@ -37,6 +38,8 @@
   let pairingPin    = $state('');
   let pairConn      = $state<WsConnection | null>(null);
   let offlineMode   = $state(false);
+  let pairQrSvg     = $state('');
+  let pairUrl       = $state('');
 
   function applyConfig(config: TvConfig) {
     savedConfig = config;
@@ -124,8 +127,18 @@
     });
   }
 
-  function startPairing() {
+  async function startPairing() {
     pairingPin = String(Math.floor(1000 + Math.random() * 9000));
+    pairUrl = `${window.location.origin}/pair?pin=${encodeURIComponent(pairingPin)}`;
+    pairQrSvg = await QRCode.toString(pairUrl, {
+      type: 'svg',
+      margin: 1,
+      width: 240,
+      color: {
+        dark: '#020617',
+        light: '#ffffff',
+      },
+    });
     pairConn?.destroy();
     pairConn = createWsConnection('tv', 'PWA TV en appairage', {
       onPairConfig: handlePairConfig,
@@ -136,6 +149,8 @@
     pairConn?.destroy();
     pairConn = null;
     pairingPin = '';
+    pairQrSvg = '';
+    pairUrl = '';
   }
 
   function forgetSavedConfig() {
@@ -214,12 +229,14 @@
   // En circuit training, toutes les stations travaillent simultanément
   const isMyWork = $derived(session?.phase.type === 'WORK');
 
+  type StationExercise = { exercise: Exercise; sets: number | null; reps: number | null };
+
   // Exercices assignés à cette station dans le circuit
-  const myExercises = $derived.by((): Exercise[] => {
+  const myExercises = $derived.by((): StationExercise[] => {
     if (!circuitData) return [];
     const sorted = [...circuitData.stations].sort((a, b) => a.position - b.position);
     const st = sorted[myStationIdx];
-    return st ? st.exercises.map(e => e.exercise) : [];
+    return st ? st.exercises : [];
   });
 
   // ════ Pause eau ════
@@ -354,13 +371,19 @@
           {#if pairingPin}
             <div class="flex items-center justify-between rounded-lg bg-slate-950 border border-slate-800 px-4 py-3">
               <div>
-                <p class="text-xs uppercase tracking-widest text-slate-500">Code PIN</p>
+              <p class="text-xs uppercase tracking-widest text-slate-500">Code PIN</p>
                 <p class="text-4xl font-black tabular-nums text-sky-300 leading-none mt-1">{pairingPin}</p>
               </div>
               <p class="text-xs text-right {pairConn?.connected ? 'text-emerald-400' : 'text-amber-400'}">
                 {pairConn?.connected ? 'En attente admin' : 'Connexion...'}
               </p>
             </div>
+            <div class="rounded-lg bg-white p-3 text-center">
+              {@html pairQrSvg}
+            </div>
+            <p class="text-xs text-slate-500 break-all">
+              Scannez le QR avec le telephone ou ouvrez: {pairUrl}
+            </p>
           {/if}
         </div>
 
@@ -608,7 +631,8 @@
                 class="h-full grid gap-3 {gridCols(myExercises.length, orientation)}"
                 style="grid-auto-rows: {orientation === 'portrait' ? 'auto' : '1fr'};"
               >
-                {#each myExercises as ex}
+                {#each myExercises as entry}
+                  {@const ex = entry.exercise}
                   <div
                     class="relative rounded-2xl overflow-hidden flex flex-col"
                     style="background: rgba(0,0,0,0.25);"
@@ -652,6 +676,16 @@
                         </div>
                       {/if}
                     </div>
+
+                    {#if entry.sets !== null && entry.reps !== null}
+                      <div
+                        class="absolute left-3 bottom-3 z-20 rounded-lg px-3 py-1.5
+                               text-lg font-black tabular-nums tracking-wide"
+                        style="background: rgba(0,0,0,0.62); color: {phaseCfg.accent}; box-shadow: 0 8px 24px rgba(0,0,0,0.35);"
+                      >
+                        {entry.sets} x {entry.reps} reps
+                      </div>
+                    {/if}
                   </div>
                 {/each}
               </div>

@@ -1,12 +1,26 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { onMount } from 'svelte';
   import { authStore } from '$lib/auth.svelte.js';
 
   let email    = $state('');
   let password = $state('');
   let error    = $state('');
   let loading  = $state(false);
+
+  function redirectAfterLogin() {
+    const redirect = $page.url.searchParams.get('redirect');
+    goto(redirect ?? '/');
+  }
+
+  onMount(async () => {
+    if (!authStore.token) return;
+    if (!authStore.user) await authStore.hydrate();
+    if (authStore.token && authStore.user) {
+      redirectAfterLogin();
+    }
+  });
 
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
@@ -17,8 +31,7 @@
       if (authStore.mustChangePassword) {
         goto('/change-password');
       } else {
-        const redirect = $page.url.searchParams.get('redirect');
-        goto(redirect ?? '/');
+        redirectAfterLogin();
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Erreur de connexion';

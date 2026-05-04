@@ -13,7 +13,7 @@
     "lint": "eslint 'src/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' --fix",
     "format": "prettier --write 'src/**/*.{ts,json,md}'",
-    "test": "tsx src/sessions/orchestrator.test.ts",
+    "test": "tsx src/sessions/orchestrator.test.ts && tsx src/routes/circuits.schema.test.ts",
     "db:migrate": "prisma migrate dev --config prisma.config.ts",
     "db:migrate:prod": "prisma migrate deploy --config prisma.config.ts",
     "db:studio": "prisma studio --config prisma.config.ts",

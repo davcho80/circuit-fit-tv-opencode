@@ -18,6 +18,12 @@ function stripUndefined(obj: Record<string, unknown>): any {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 }
 
+function exerciseConfigMap(
+  configs: Array<{ exerciseId: string; sets: number; reps: number }> | undefined,
+): Map<string, { sets: number; reps: number }> {
+  return new Map(configs?.map((config) => [config.exerciseId, { sets: config.sets, reps: config.reps }]) ?? []);
+}
+
 const circuitInclude = {
   stations: {
     orderBy: { position: 'asc' as const },
@@ -57,18 +63,25 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
         coachNotes: circuitData.coachNotes ?? null,
         whiteboardEnabled: circuitData.whiteboardEnabled ?? true,
         stations: {
-          create: stations.map((s) => ({
-            position:           s.position,
-            layoutX:            s.layoutX ?? null,
-            layoutY:            s.layoutY ?? null,
-            stationMode:        (s.stationMode ?? 'TIME') as 'TIME' | 'REPS',
-            sets:               s.sets ?? null,
-            reps:               s.reps ?? null,
-            restBetweenSetsSec: s.restBetweenSetsSec ?? null,
-            exercises: {
-              create: s.exerciseIds.map((exerciseId) => ({ exerciseId })),
-            },
-          })),
+          create: stations.map((s) => {
+            const configs = exerciseConfigMap(s.exerciseConfigs);
+            return {
+              position:           s.position,
+              layoutX:            s.layoutX ?? null,
+              layoutY:            s.layoutY ?? null,
+              stationMode:        (s.stationMode ?? 'TIME') as 'TIME' | 'REPS',
+              sets:               s.sets ?? null,
+              reps:               s.reps ?? null,
+              restBetweenSetsSec: s.restBetweenSetsSec ?? null,
+              exercises: {
+                create: s.exerciseIds.map((exerciseId) => ({
+                  exerciseId,
+                  sets: configs.get(exerciseId)?.sets ?? null,
+                  reps: configs.get(exerciseId)?.reps ?? null,
+                })),
+              },
+            };
+          }),
         },
         ...(scheduledBreaks?.length && {
           scheduledBreaks: { create: scheduledBreaks.map((b) => ({ afterRound: b.afterRound, durationSec: b.durationSec, label: b.label ?? 'Pause eau' })) },
@@ -148,6 +161,11 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
         sets:              z.number().int().min(1).max(20).nullable().optional(),
         reps:              z.number().int().min(1).max(200).nullable().optional(),
         restBetweenSetsSec: z.number().int().min(0).max(600).nullable().optional(),
+        exerciseConfigs:   z.array(z.object({
+          exerciseId: z.string().uuid(),
+          sets:       z.number().int().min(1).max(20),
+          reps:       z.number().int().min(1).max(200),
+        })).optional(),
       })).min(2),
     });
     const body = StationsBody.safeParse(req.body);
@@ -158,6 +176,7 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
     await prisma.$transaction(async (tx) => {
       await tx.circuitStation.deleteMany({ where: { circuitId: req.params.id } });
       for (const s of body.data.stations) {
+        const configs = exerciseConfigMap(s.exerciseConfigs);
         await tx.circuitStation.create({
           data: {
             circuitId:          req.params.id,
@@ -169,7 +188,11 @@ export async function circuitsRoutes(app: FastifyInstance): Promise<void> {
             reps:               s.reps ?? null,
             restBetweenSetsSec: s.restBetweenSetsSec ?? null,
             exercises: {
-              create: s.exerciseIds.map((exerciseId) => ({ exerciseId })),
+              create: s.exerciseIds.map((exerciseId) => ({
+                exerciseId,
+                sets: configs.get(exerciseId)?.sets ?? null,
+                reps: configs.get(exerciseId)?.reps ?? null,
+              })),
             },
           },
         });

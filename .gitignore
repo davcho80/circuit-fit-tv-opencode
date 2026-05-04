@@ -133,3 +133,4 @@ backups/
 # ----- Context de développement -----
 .claude/
 .cursor/
+.superpowers/

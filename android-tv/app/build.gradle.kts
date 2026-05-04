@@ -15,7 +15,7 @@ android {
         buildConfigField(
             "String",
             "CFITV_TV_URL",
-            "\"${providers.gradleProperty("cfitvTvUrl").getOrElse("http://10.0.2.2:3000/tv")}\"",
+            "\"${providers.gradleProperty("cfitvTvUrl").getOrElse("")}\"",
         )
     }
 
