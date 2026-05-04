@@ -378,7 +378,7 @@ app.get('/ws', { websocket: true }, (socket, _req) => {
       // Mettre à jour lastSeen à la connexion d'un écran TV appairé
       if (role === 'tv' && displayId) {
         prisma.display.update({ where: { id: displayId }, data: { lastSeen: new Date() } })
-          .catch(() => { /* display peut avoir été supprimé */ });
+          .catch((err) => app.log.warn({ err, displayId }, 'Failed to update lastSeen'));
       }
 
       // WELCOME
@@ -399,8 +399,12 @@ app.get('/ws', { websocket: true }, (socket, _req) => {
     handleMessage(client, str);
   });
 
-  socket.on('close', () => {
-    clearTimeout(registerTimeout);
+hub.onSendError = (client, err) => {
+      app.log.warn({ clientId: client.id, err }, 'WS send failed');
+    };
+
+    socket.on('close', () => {
+      clearTimeout(registerTimeout);
     app.log.info({ clientId: client.id }, 'WS client disconnected');
     removeByClient(client.id);   // nettoyage PIN d'appairage si en cours
     hub.remove(client.id);

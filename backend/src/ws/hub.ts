@@ -66,11 +66,20 @@ class WsHub {
     return this.all().filter((c) => c.role === role);
   }
 
-  send(client: ConnectedClient, msg: ServerMessage): void {
-    if (client.socket.readyState === client.socket.OPEN) {
+  send(client: ConnectedClient, msg: ServerMessage): boolean {
+    try {
+      if (client.socket.readyState !== client.socket.OPEN) {
+        return false;
+      }
       client.socket.send(JSON.stringify(msg));
+      return true;
+    } catch (err) {
+      this.onSendError?.(client, err);
+      return false;
     }
   }
+
+  onSendError?: (client: ConnectedClient, err: unknown) => void;
 
   broadcast(msg: ServerMessage, filter?: (c: ConnectedClient) => boolean): void {
     for (const client of this.clients.values()) {

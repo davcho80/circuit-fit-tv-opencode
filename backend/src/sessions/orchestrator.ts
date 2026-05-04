@@ -83,15 +83,15 @@ class SessionOrchestrator {
   pause(): void {
     if (!this.active || this.active.pausedAt !== null) return;
 
-    if (this.active.timer) clearTimeout(this.active.timer);
+    this.clearTimer(this.active.timer);
     this.active.timer = null;
     this.active.pausedAt = Date.now();
     this.active.remainingOnPauseMs = Math.max(0, this.active.phaseEndsAt - this.active.pausedAt);
 
-    void prisma.session.update({
+    prisma.session.update({
       where: { id: this.active.sessionId },
       data: { status: 'PAUSED', pausedAt: new Date(this.active.pausedAt), remainingOnPauseMs: this.active.remainingOnPauseMs },
-    });
+    }).catch((_err) => console.warn('Failed to pause session:', _err));
 
     this.broadcastSessionUpdate();
   }
@@ -99,11 +99,8 @@ class SessionOrchestrator {
   resume(): void {
     if (!this.active || this.active.pausedAt === null) return;
 
-    // Annule la pause eau si elle était en cours
-    if (this.active.hydrationBreakTimer) {
-      clearTimeout(this.active.hydrationBreakTimer);
-      this.active.hydrationBreakTimer = null;
-    }
+    this.clearTimer(this.active.hydrationBreakTimer);
+    this.active.hydrationBreakTimer = null;
     this.active.hydrationBreakEndsAt = null;
 
     const remaining = this.active.remainingOnPauseMs ?? 0;
@@ -113,10 +110,10 @@ class SessionOrchestrator {
     this.active.pausedAt = null;
     this.active.remainingOnPauseMs = null;
 
-    void prisma.session.update({
+    prisma.session.update({
       where: { id: this.active.sessionId },
       data: { status: 'RUNNING', pausedAt: null, remainingOnPauseMs: null },
-    });
+    }).catch((_err) => console.warn('Failed to resume session:', _err));
 
     this.scheduleNext(remaining);
     this.broadcastSessionUpdate();
@@ -125,22 +122,18 @@ class SessionOrchestrator {
   hydrationBreak(durationMs: number): void {
     if (!this.active) return;
 
-    // Annule un break eau déjà actif
-    if (this.active.hydrationBreakTimer) {
-      clearTimeout(this.active.hydrationBreakTimer);
-      this.active.hydrationBreakTimer = null;
-    }
+    this.clearTimer(this.active.hydrationBreakTimer);
+    this.active.hydrationBreakTimer = null;
 
-    // Pause la phase si elle tourne
     if (this.active.pausedAt === null) {
-      if (this.active.timer) clearTimeout(this.active.timer);
+      this.clearTimer(this.active.timer);
       this.active.timer = null;
       this.active.pausedAt = Date.now();
       this.active.remainingOnPauseMs = Math.max(0, this.active.phaseEndsAt - this.active.pausedAt);
-      void prisma.session.update({
+      prisma.session.update({
         where: { id: this.active.sessionId },
         data: { status: 'PAUSED', pausedAt: new Date(this.active.pausedAt), remainingOnPauseMs: this.active.remainingOnPauseMs },
-      });
+      }).catch((_err) => console.warn('Failed to update hydration break:', _err));
     }
 
     this.active.hydrationBreakEndsAt = Date.now() + durationMs;
@@ -157,7 +150,8 @@ class SessionOrchestrator {
 
   skip(): void {
     if (!this.active) return;
-    if (this.active.timer) clearTimeout(this.active.timer);
+    this.clearTimer(this.active.timer);
+    this.active.timer = null;
     void this.advancePhase();
   }
 
@@ -165,7 +159,8 @@ class SessionOrchestrator {
     if (!this.active || this.active.pausedAt !== null) return;
 
     this.active.phaseEndsAt += deltaMs;
-    if (this.active.timer) clearTimeout(this.active.timer);
+    this.clearTimer(this.active.timer);
+    this.active.timer = null;
     const remaining = Math.max(0, this.active.phaseEndsAt - Date.now());
     this.scheduleNext(remaining);
     this.broadcastSessionUpdate();
@@ -208,10 +203,27 @@ class SessionOrchestrator {
     };
   }
 
+private clearTimer(timer: ReturnType<typeof setTimeout> | null): void {
+    if (timer) clearTimeout(timer);
+  }
+
+  private clearTimers(): void {
+    if (!this.active) return;
+    this.clearTimer(this.active.timer);
+    this.clearTimer(this.active.hydrationBreakTimer);
+    this.active.timer = null;
+    this.active.hydrationBreakTimer = null;
+  }
+
   private scheduleNext(ms: number): void {
     this.active!.timer = setTimeout(() => {
       void this.advancePhase();
     }, ms);
+  }
+
+  private cleanupTimers(): void {
+    this.clearTimer(this.active?.timer ?? null);
+    this.clearTimer(this.active?.hydrationBreakTimer ?? null);
   }
 
   private async advancePhase(): Promise<void> {
@@ -230,15 +242,21 @@ class SessionOrchestrator {
     this.active.phaseStartsAt = now;
     this.active.phaseEndsAt = now + nextPhase.durationMs;
 
-    await prisma.session.update({
-      where: { id: this.active.sessionId },
-      data: {
-        currentRound: nextPhase.round,
-        currentPhase: nextPhase.type,
-        currentStationIdx: nextPhase.stationIdx,
-        phaseEndsAt: new Date(this.active.phaseEndsAt),
-      },
-    });
+    try {
+      await prisma.session.update({
+        where: { id: this.active.sessionId },
+        data: {
+          currentRound: nextPhase.round,
+          currentPhase: nextPhase.type,
+          currentStationIdx: nextPhase.stationIdx,
+          phaseEndsAt: new Date(this.active.phaseEndsAt),
+        },
+      });
+    } catch {
+      this.active.timer = null;
+      await this.abort();
+      return;
+    }
 
     this.scheduleNext(nextPhase.durationMs);
     this.broadcastSessionUpdate();
@@ -250,9 +268,8 @@ class SessionOrchestrator {
   ): Promise<void> {
     if (!this.active) return;
 
-    if (this.active.timer) clearTimeout(this.active.timer);
-    if (this.active.hydrationBreakTimer) clearTimeout(this.active.hydrationBreakTimer);
     const sessionId = this.active.sessionId;
+    this.cleanupTimers();
     this.active = null;
 
     await prisma.session.update({
